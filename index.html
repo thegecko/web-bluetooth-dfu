@@ -57,27 +57,15 @@
 
         function setMode() {
             dfu.findDevice({ services: [0x180D] })
-            .then(device => {
-                log('Found device: ' + device.name);
-                return dfu.writeMode(device);
-            })
-            .then(device => {
-                log('mode written');
-                transfer(device);
-            })
-            .catch(error => {
-                log(error);
-            });
+            .then(device => dfu.writeMode(device))
+            .then(device => transfer(device))
+            .catch(log);
         }
 
         function findDFU() {
             dfu.findDevice({ name: "DfuTarg" })
-            .then(device => {
-                transfer(device);
-            })
-            .catch(error => {
-                log(error);
-            });
+            .then(device => transfer(device))
+            .catch(log);
         }
 
     </script>

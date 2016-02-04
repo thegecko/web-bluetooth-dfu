@@ -182,9 +182,54 @@
             interval = Math.floor(arrayBuffer.byteLength / (packetSize * notifySteps));
             offset = 0;
 
-            controlChar.addEventListener('characteristicvaluechanged', data => {
+            if (!controlChar.properties.notify) {
+                var error = "controlChar missing notify property";
+                log(error);
+                return reject(error);
+            }
+
+            log("enabling notifications");
+            controlChar.startNotifications()
+            .then(() => {
+                controlChar.addEventListener('characteristicvaluechanged', handleControl);
+                log("sending imagetype: " + imageType);
+                return controlChar.writeValue(new Uint8Array([1, imageType]))
+            })
+            .then(() => {
+                log("sent start");
+
+                var softLength = (imageType === ImageType.SoftDevice) ? arrayBuffer.byteLength : 0;
+                var bootLength = (imageType === ImageType.Bootloader) ? arrayBuffer.byteLength : 0;
+                var appLength = (imageType === ImageType.Application) ? arrayBuffer.byteLength : 0;
+
+                var buffer = new ArrayBuffer(12);
+                var view = new DataView(buffer);
+                view.setUint32(0, softLength, littleEndian);
+                view.setUint32(4, bootLength, littleEndian);
+                view.setUint32(8, appLength, littleEndian);
+
+                // Set firmware length
+                packetChar.writeValue(view)
+                .then(() => {
+                    log("sent buffer size: " + arrayBuffer.byteLength);
+                })
+                .catch(error => {
+                    error = "firmware length error: " + error;
+                    log(error);
+                    reject(error);
+                });
+            })
+            .catch(error => {
+                error = "start error: " + error;
+                log(error);
+                reject(error);
+            });
+
+            function handleControl(event) {
+                var data = event.target.value;
                 var view = new DataView(data);
                 var opCode = view.getUint8(0);
+                log("opCode received: " + opCode);
 
                 if (opCode === 16) { // response
                     var resp_code = view.getUint8(2);
@@ -275,53 +320,11 @@
                     log('transferred: ' + bytecount);
                     writePacket(arrayBuffer, 0);
                 }
-            });
-
-            if (!controlChar.properties.notify) {
-                var error = "controlChar missing notify property";
-                log(error);
-                return reject(error);
             }
-
-            log("enabling notifications");
-            controlChar.startNotifications()
-            .then(() => {
-                log("sending imagetype: " + imageType);
-                return controlChar.writeValue(new Uint8Array([1, imageType]))
-            })
-            .then(() => {
-                log("sent start");
-
-                var softLength = (imageType === ImageType.SoftDevice) ? arrayBuffer.byteLength : 0;
-                var bootLength = (imageType === ImageType.Bootloader) ? arrayBuffer.byteLength : 0;
-                var appLength = (imageType === ImageType.Application) ? arrayBuffer.byteLength : 0;
-
-                var buffer = new ArrayBuffer(12);
-                var view = new DataView(buffer);
-                view.setUint32(0, softLength, littleEndian);
-                view.setUint32(4, bootLength, littleEndian);
-                view.setUint32(8, appLength, littleEndian);
-
-                // Set firmware length
-                packetChar.writeValue(view)
-                .then(() => {
-                    log("sent buffer size: " + arrayBuffer.byteLength);
-                })
-                .catch(error => {
-                    error = "firmware length error: " + error;
-                    log(error);
-                    reject(error);
-                });
-            })
-            .catch(error => {
-                error = "start error: " + error;
-                log(error);
-                reject(error);
-            });
         });
     }
 
-    function writePacket(arrayBuffer, offset, count) {
+    function writePacket(arrayBuffer, count) {
         var size = (offset + packetSize > arrayBuffer.byteLength) ? arrayBuffer.byteLength - offset : packetSize;
         var packet = arrayBuffer.slice(offset, offset + size);
         var view = new Uint8Array(packet);
