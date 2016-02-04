@@ -45,11 +45,16 @@
     var versionChar = null;
     var server = null;
 
-    // Hack to see debug info
-    var resultsEl = document.getElementById("results");
-    function logFn(message) {
-        console.log(message);
-        resultsEl.innerText += message + "\n";
+    var loggers = [];
+    function addLogger(loggerFn) {
+        if (typeof loggerFn === "function") {
+            loggers.push(loggerFn);
+        }
+    }
+    function log(message) {
+        loggers.forEach(logger => {
+            logger(message);
+        });
     }
 
     function findDevice(filters) {
@@ -65,22 +70,22 @@
             // Disconnect event currently not implemented
 /*
             device.addEventListener("gattserverdisconnected", () => {
-                logFn("modeData written");
+                log("modeData written");
                 resolve();                
             });
 */
             connect(device)
             .then(() => {
-                logFn("writing modeData...");
+                log("writing modeData...");
                 controlChar.writeValue(new Uint8Array([1]));
                 return server.disconnect();
             })
             .then(() => {
-                logFn("modeData written");
+                log("modeData written");
                 resolve(device);
             }).catch(error => {
                 error = "writeMode error: " + error;
-                logFn(error);
+                log(error);
                 reject(error);
             });
         });
@@ -109,7 +114,7 @@
                 resolve();
             })
             .catch(error => {
-                logFn(error);
+                log(error);
                 reject(error);
             });
         });
@@ -121,7 +126,7 @@
             // Disconnect event currently not implemented
 /*
             device.addEventListener("gattserverdisconnected", () => {
-                logFn("device disconnected");
+                log("device disconnected");
                 service = null;
                 controlChar = null;
                 packetChar = null;
@@ -133,25 +138,25 @@
             .then(gattServer => {
                 // Connected
                 server = gattServer;
-                logFn("connected to device");
+                log("connected to device");
                 return server.getPrimaryService(serviceUUID);
             })
             .then(primaryService => {
-                logFn("found DFU service");
+                log("found DFU service");
                 service = primaryService;
                 return service.getCharacteristic(controlUUID);
             })
             .then(characteristic => {
-                logFn("found control characteristic");
+                log("found control characteristic");
                 controlChar = characteristic;
                 return service.getCharacteristic(packetUUID);
             })
             .then(characteristic => {
-                logFn("found packet characteristic");
+                log("found packet characteristic");
                 packetChar = characteristic;
                 service.getCharacteristic(versionUUID)
                 .then(() => {
-                    logFn("found version characteristic");
+                    log("found version characteristic");
                     versionChar = characteristic;
                     resolve();
                 })
@@ -161,7 +166,7 @@
             })
             .catch(error => {
                 error = "connect error: " + error;
-                logFn(error);
+                log(error);
                 reject(error);
             });
         });
@@ -171,7 +176,7 @@
     var offset;
     function transfer(arrayBuffer, imageType, majorVersion, minorVersion) {
         return new Promise(function(resolve, reject) {
-            logFn('using dfu version ' + majorVersion + "." + minorVersion);
+            log('using dfu version ' + majorVersion + "." + minorVersion);
 
             // Set up receipts
             interval = Math.floor(arrayBuffer.byteLength / (packetSize * notifySteps));
@@ -185,13 +190,13 @@
                     var resp_code = view.getUint8(2);
                     if (resp_code !== 1) {
                         var error = "error from control: " + resp_code;
-                        logFn(error);
+                        log(error);
                         return reject(error);
                     }
 
                     var req_opcode = view.getUint8(1);
                     if (req_opcode === 1 && majorVersion > 6) {
-                        logFn('write null init packet');
+                        log('write null init packet');
 
                         controlChar.writeValue(new Uint8Array([2,0]))
                         .then(() => {
@@ -202,12 +207,12 @@
                         })
                         .catch(error => {
                             error = "error writing init: " + error;
-                            logFn(error);
+                            log(error);
                             reject(error);
                         });
 
                     } else if (req_opcode === 1 || req_opcode === 2) {
-                        logFn('complete, send packet count');
+                        log('complete, send packet count');
 
                         var buffer = new ArrayBuffer(3);
                         var view = new DataView(buffer);
@@ -216,43 +221,43 @@
 
                         controlChar.writeValue(view)
                         .then(() => {
-                            logFn("sent packet count: " + interval);
+                            log("sent packet count: " + interval);
                             return controlChar.writeValue(new Uint8Array([3]));
                         })
                         .then(() => {
-                            logFn("sent receive");
+                            log("sent receive");
                             return writePacket(arrayBuffer, 0);
                         })
                         .catch(error => {
                             error = "error sending packet count: " + error;
-                            logFn(error);
+                            log(error);
                             reject(error);
                         });
 
                     } else if (req_opcode === 3) {
-                        logFn('complete, check length');
+                        log('complete, check length');
 
                         controlChar.writeValue(new Uint8Array([7]))
                         .catch(error => {
                             error = "error checking length: " + error;
-                            logFn(error);
+                            log(error);
                             reject(error);
                         });
 
                     } else if (req_opcode === 7) {
                         var bytecount = view.getUint32(3, littleEndian);
-                        logFn('length: ' + bytecount);
-                        logFn('complete, validate...');
+                        log('length: ' + bytecount);
+                        log('complete, validate...');
 
                         controlChar.writeValue(new Uint8Array([4]))
                         .catch(error => {
                             error = "error validating: " + error;
-                            logFn(error);
+                            log(error);
                             reject(error);
                         });
 
                     } else if (req_opcode === 4) {
-                        logFn('complete, reset...');
+                        log('complete, reset...');
 
                         controlChar.writeValue(new Uint8Array([5]))
                         .then(() => {
@@ -260,32 +265,32 @@
                         })
                         .catch(error => {
                             error = "error resetting: " + error;
-                            logFn(error);
+                            log(error);
                             reject(error);
                         });
                     }
 
                 } else if (opCode === 17) {
                     var bytecount = view.getUint32(1, littleEndian);
-                    logFn('transferred: ' + bytecount);
+                    log('transferred: ' + bytecount);
                     writePacket(arrayBuffer, 0);
                 }
             });
 
             if (!controlChar.properties.notify) {
                 var error = "controlChar missing notify property";
-                logFn(error);
+                log(error);
                 return reject(error);
             }
 
-            logFn("enabling notifications");
+            log("enabling notifications");
             controlChar.startNotifications()
             .then(() => {
-                logFn("sending imagetype: " + imageType);
+                log("sending imagetype: " + imageType);
                 return controlChar.writeValue(new Uint8Array([1, imageType]))
             })
             .then(() => {
-                logFn("sent start");
+                log("sent start");
 
                 var softLength = (imageType === ImageType.SoftDevice) ? arrayBuffer.byteLength : 0;
                 var bootLength = (imageType === ImageType.Bootloader) ? arrayBuffer.byteLength : 0;
@@ -300,17 +305,17 @@
                 // Set firmware length
                 packetChar.writeValue(view)
                 .then(() => {
-                    logFn("sent buffer size: " + arrayBuffer.byteLength);            
+                    log("sent buffer size: " + arrayBuffer.byteLength);
                 })
                 .catch(error => {
                     error = "firmware length error: " + error;
-                    logFn(error);
+                    log(error);
                     reject(error);
                 });
             })
             .catch(error => {
                 error = "start error: " + error;
-                logFn(error);
+                log(error);
                 reject(error);
             });
         });
@@ -331,11 +336,12 @@
         })
         .catch(error => {
             error = "writePacket error: " + error;
-            logFn(error);
+            log(error);
         });
     }
 
     return {
+        addLogger: addLogger,
         ImageType: ImageType,
         findDevice: findDevice,
         writeMode: writeMode,

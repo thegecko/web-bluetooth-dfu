@@ -20,6 +20,7 @@
             console.log(message);
             resultsEl.innerText += message + "\n";
         }
+        dfu.addLogger(log);
 
         function download(url) {
             return new Promise(function(resolve, reject) {
