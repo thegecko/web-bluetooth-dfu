@@ -1,84 +1,84 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title>web-bluetooth-dfu</title>
+    <title>web-bluetooth-dfu</title>
 </head>
 <body>
-	<button onclick="setMode()" style="font-size: 42px;">Set Mode and Transfer</button>
-	<button onclick="findDFU()" style="font-size: 42px;">Transfer Only</button>
-	<div id="results"></div>
+    <button onclick="setMode()" style="font-size: 42px;">Set Mode and Transfer</button>
+    <button onclick="findDFU()" style="font-size: 42px;">Transfer Only</button>
+    <div id="results"></div>
 
-	<script src="dist/dfu.js"></script>
-	<script src="dist/hex2bin.js"></script>
+    <script src="dist/dfu.js"></script>
+    <script src="dist/hex2bin.js"></script>
 
-	<script>
-		var names = ["DFU_Test", "Hi_Rob", "Bye_Rob"];
-		var urlMask = "//thegecko.github.io/web-bluetooth-dfu/firmware/NRF51822_{0}_Rob_OTA.hex";
-		var resultsEl = document.getElementById("results");
+    <script>
+        var names = ["DFU_Test", "Hi_Rob", "Bye_Rob"];
+        var urlMask = "//thegecko.github.io/web-bluetooth-dfu/firmware/NRF51822_{0}_Rob_OTA.hex";
+        var resultsEl = document.getElementById("results");
 
-		function log(message) {
-			console.log(message);
-			resultsEl.innerText += message + "\n";
-		}
+        function log(message) {
+            console.log(message);
+            resultsEl.innerText += message + "\n";
+        }
 
-		function download(url) {
+        function download(url) {
             return new Promise(function(resolve, reject) {
-				var xhr = new XMLHttpRequest();
-				xhr.addEventListener("load", function() {
-					resolve(this.responseText);
-				});
-				xhr.open("GET", url);
-				xhr.send();
+                var xhr = new XMLHttpRequest();
+                xhr.addEventListener("load", function() {
+                    resolve(this.responseText);
+                });
+                xhr.open("GET", url);
+                xhr.send();
             });
-		}
+        }
 
-		function transfer(device) {
-			return new Promise(function(resolve, reject) {
-				var url = urlMask.replace("{0}", device.name === "Hi_Rob" ? "Bye" : "Hi");
+        function transfer(device) {
+            return new Promise(function(resolve, reject) {
+                var url = urlMask.replace("{0}", device.name === "Hi_Rob" ? "Bye" : "Hi");
 
-				download(url)
-				.then(hex => {
-					var buffer = hex2bin(hex);
-					log("downloaded length: " + buffer.byteLength);
+                download(url)
+                .then(hex => {
+                    var buffer = hex2bin(hex);
+                    log("downloaded length: " + buffer.byteLength);
 
-					return dfu.provision(device, buffer);
-				})
-				.then(() => {
-					log('dfu complete');
-					resolve();
-				})
-				.catch(error => {
-					log(error);
-					reject(error);
-				});
+                    return dfu.provision(device, buffer);
+                })
+                .then(() => {
+                    log('dfu complete');
+                    resolve();
+                })
+                .catch(error => {
+                    log(error);
+                    reject(error);
+                });
             });
-		}
+        }
 
-		function setMode() {
-			dfu.findDevice({ services: [0x180D] })
-			.then(device => {
-				log('Found device: ' + device.name);
-				return dfu.writeMode(device);
-			})
-			.then(device => {
-				log('mode written');
-				transfer(device);
-			})
-			.catch(error => {
-				log(error);
-			});
-		}
+        function setMode() {
+            dfu.findDevice({ services: [0x180D] })
+            .then(device => {
+                log('Found device: ' + device.name);
+                return dfu.writeMode(device);
+            })
+            .then(device => {
+                log('mode written');
+                transfer(device);
+            })
+            .catch(error => {
+                log(error);
+            });
+        }
 
-		function findDFU() {
-			dfu.findDevice({ name: "DfuTarg" })
-			.then(device => {
-				transfer(device);
-			})
-			.catch(error => {
-				log(error);
-			});
-		}
+        function findDFU() {
+            dfu.findDevice({ name: "DfuTarg" })
+            .then(device => {
+                transfer(device);
+            })
+            .catch(error => {
+                log(error);
+            });
+        }
 
-	</script>
+    </script>
 </body>
 </html>
