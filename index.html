@@ -4,8 +4,9 @@
     <title>web-bluetooth-dfu</title>
 </head>
 <body>
-    <button onclick="setMode()" style="font-size: 42px;">Set Mode and Transfer</button>
-    <button onclick="findDFU()" style="font-size: 42px;">Transfer Only</button>
+    <button onclick="setMode()" style="font-size: 42px;">Set Mode</button>
+    <button onclick="findDFU()" style="font-size: 42px;">Transfer</button>
+    <button onclick="both()" style="font-size: 42px;">Both</button>
     <div id="results"></div>
 
     <script src="dist/dfu.js"></script>
@@ -58,12 +59,18 @@
         function setMode() {
             dfu.findDevice({ services: [0x180D] })
             .then(device => dfu.writeMode(device))
-            .then(device => transfer(device))
             .catch(log);
         }
 
         function findDFU() {
             dfu.findDevice({ name: "DfuTarg" })
+            .then(device => transfer(device))
+            .catch(log);
+        }
+
+        function both() {
+            dfu.findDevice({ services: [0x180D] })
+            .then(device => dfu.writeMode(device))
             .then(device => transfer(device))
             .catch(log);
         }
