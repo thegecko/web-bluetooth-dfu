@@ -40,11 +40,6 @@
         return new Int16Array(buffer)[0] === 256;
     })();
 
-    var controlChar = null;
-    var packetChar = null;
-    var versionChar = null;
-    var server = null;
-
     var loggers = [];
     function addLogger(loggerFn) {
         if (typeof loggerFn === "function") {
@@ -66,24 +61,28 @@
 
     function writeMode(device) {
         return new Promise(function(resolve, reject) {
-
-            // Disconnect event currently not implemented
 /*
+            // Disconnect event currently not implemented
             device.addEventListener("gattserverdisconnected", () => {
                 log("modeData written");
                 resolve();                
             });
 */
             connect(device)
-            .then(() => {
+            .then(chars => {
                 log("writing modeData...");
-                controlChar.writeValue(new Uint8Array([1]));
-                return server.disconnect();
+                chars.controlChar.writeValue(new Uint8Array([1]));
+
+                // Hack to gracefully disconnect without disconnect event
+                setTimeout(() => {
+                    chars.server.disconnect();
+                    setTimeout(() => {
+                        log("modeData written");
+                        resolve(device);
+                    }, 1000);
+                }, 1000);
             })
-            .then(() => {
-                log("modeData written");
-                resolve(device);
-            }).catch(error => {
+            .catch(error => {
                 error = "writeMode error: " + error;
                 log(error);
                 reject(error);
@@ -96,18 +95,18 @@
             imageType = imageType || ImageType.Application;
 
             connect(device)
-            .then(() => {
-                if (versionChar) {
-                    versionChar.readValue()
+            .then(chars => {
+                if (chars.versionChar) {
+                    chars.versionChar.readValue()
                     .then(data => {
                         var view = new DataView(data);
                         var major = view.getUint8(0);
                         var minor = view.getUint8(1);
-                        return transfer(arrayBuffer, imageType, major, minor);
+                        return transfer(chars, arrayBuffer, imageType, major, minor);
                     });
                 } else {
                     // Default to version 6.0
-                    return transfer(arrayBuffer, imageType, 6, 0);
+                    return transfer(chars, arrayBuffer, imageType, 6, 0);
                 }
             })
             .then(() => {
@@ -122,18 +121,21 @@
 
     function connect(device) {
         return new Promise(function(resolve, reject) {
+            var server = null;
             var service = null;
-            // Disconnect event currently not implemented
-/*
-            device.addEventListener("gattserverdisconnected", () => {
-                log("device disconnected");
-                service = null;
-                controlChar = null;
-                packetChar = null;
-                versionChar = null;
-                server = null;
-            });
-*/
+            var controlChar = null;
+            var packetChar = null;
+            var versionChar = null;
+
+            function complete() {
+                resolve({
+                    server: server,
+                    controlChar: controlChar,
+                    packetChar: packetChar,
+                    versionChar: versionChar
+                });
+            }
+
             device.connectGATT()
             .then(gattServer => {
                 // Connected
@@ -158,10 +160,10 @@
                 .then(() => {
                     log("found version characteristic");
                     versionChar = characteristic;
-                    resolve();
+                    complete();
                 })
                 .catch(error => {
-                    resolve();
+                    complete();
                 });
             })
             .catch(error => {
@@ -174,8 +176,10 @@
 
     var interval;
     var offset;
-    function transfer(arrayBuffer, imageType, majorVersion, minorVersion) {
+    function transfer(chars, arrayBuffer, imageType, majorVersion, minorVersion) {
         return new Promise(function(resolve, reject) {
+            var controlChar = chars.controlChar;
+            var packetChar = chars.packetChar;
             log('using dfu version ' + majorVersion + "." + minorVersion);
 
             // Set up receipts
@@ -188,13 +192,8 @@
                 return reject(error);
             }
 
-            log("enabling notifications");
-            controlChar.startNotifications()
-            .then(() => {
-                controlChar.addEventListener('characteristicvaluechanged', handleControl);
-                log("sending imagetype: " + imageType);
-                return controlChar.writeValue(new Uint8Array([1, imageType]))
-            })
+            log("sending imagetype: " + imageType);
+            controlChar.writeValue(new Uint8Array([1, imageType]))
             .then(() => {
                 log("sent start");
 
@@ -209,15 +208,16 @@
                 view.setUint32(8, appLength, littleEndian);
 
                 // Set firmware length
-                packetChar.writeValue(view)
+                return packetChar.writeValue(view)
+            })
+            .then(() => {
+                log("sent buffer size: " + arrayBuffer.byteLength);
+                log("enabling notifications");
+                return controlChar.startNotifications()
                 .then(() => {
-                    log("sent buffer size: " + arrayBuffer.byteLength);
+                    log("notifications started");
+                    controlChar.addEventListener('characteristicvaluechanged', handleControl);
                 })
-                .catch(error => {
-                    error = "firmware length error: " + error;
-                    log(error);
-                    reject(error);
-                });
             })
             .catch(error => {
                 error = "start error: " + error;
@@ -271,7 +271,7 @@
                         })
                         .then(() => {
                             log("sent receive");
-                            return writePacket(arrayBuffer, 0);
+                            return writePacket(packetChar, arrayBuffer, 0);
                         })
                         .catch(error => {
                             error = "error sending packet count: " + error;
@@ -318,13 +318,13 @@
                 } else if (opCode === 17) {
                     var bytecount = view.getUint32(1, littleEndian);
                     log('transferred: ' + bytecount);
-                    writePacket(arrayBuffer, 0);
+                    writePacket(packetChar, arrayBuffer, 0);
                 }
             }
         });
     }
 
-    function writePacket(arrayBuffer, count) {
+    function writePacket(packetChar, arrayBuffer, count) {
         var size = (offset + packetSize > arrayBuffer.byteLength) ? arrayBuffer.byteLength - offset : packetSize;
         var packet = arrayBuffer.slice(offset, offset + size);
         var view = new Uint8Array(packet);
@@ -334,7 +334,7 @@
             count ++;
             offset += packetSize;
             if (count < interval && offset < arrayBuffer.byteLength) {
-                writePacket(arrayBuffer, count);
+                writePacket(packetChar, arrayBuffer, count);
             }
         })
         .catch(error => {
