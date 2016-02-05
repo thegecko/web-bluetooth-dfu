@@ -192,8 +192,13 @@
                 return reject(error);
             }
 
-            log("sending imagetype: " + imageType);
-            controlChar.writeValue(new Uint8Array([1, imageType]))
+            log("enabling notifications");
+            controlChar.startNotifications()
+            .then(() => {
+                controlChar.addEventListener('characteristicvaluechanged', handleControl);
+                log("sending imagetype: " + imageType);
+                return controlChar.writeValue(new Uint8Array([1, imageType]));
+            })
             .then(() => {
                 log("sent start");
 
@@ -212,12 +217,6 @@
             })
             .then(() => {
                 log("sent buffer size: " + arrayBuffer.byteLength);
-                log("enabling notifications");
-                return controlChar.startNotifications()
-                .then(() => {
-                    log("notifications started");
-                    controlChar.addEventListener('characteristicvaluechanged', handleControl);
-                })
             })
             .catch(error => {
                 error = "start error: " + error;
@@ -226,6 +225,7 @@
             });
 
             function handleControl(event) {
+                log("event received");
                 var data = event.target.value;
                 var view = new DataView(data);
                 var opCode = view.getUint8(0);
