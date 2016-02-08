@@ -7,4 +7,4 @@ Put this firmware onto an [nrf51822](https://www.nordicsemi.com/eng/Products/nRF
 
 Reset the device and open this site in a [web-bluetooth](https://webbluetoothcg.github.io/web-bluetooth/) enabled browser:
 
-[https://thegecko.github.io/web-bluetooth-dfu](https://thegecko.github.io/web-bluetooth-dfu)
+[https://thegecko.github.io/web-bluetooth-dfu/](https://thegecko.github.io/web-bluetooth-dfu/)
