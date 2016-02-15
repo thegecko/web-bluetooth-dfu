@@ -79,8 +79,8 @@
                     setTimeout(() => {
                         log("modeData written");
                         resolve(device);
-                    }, 1000);
-                }, 1000);
+                    }, 3000);
+                }, 3000);
             })
             .catch(error => {
                 error = "writeMode error: " + error;
@@ -97,7 +97,7 @@
             connect(device)
             .then(chars => {
                 if (chars.versionChar) {
-                    chars.versionChar.readValue()
+                    return chars.versionChar.readValue()
                     .then(data => {
                         var view = new DataView(data);
                         var major = view.getUint8(0);
@@ -157,7 +157,7 @@
                 log("found packet characteristic");
                 packetChar = characteristic;
                 service.getCharacteristic(versionUUID)
-                .then(() => {
+                .then(characteristic => {
                     log("found version characteristic");
                     versionChar = characteristic;
                     complete();
@@ -225,11 +225,9 @@
             });
 
             function handleControl(event) {
-                log("event received");
                 var data = event.target.value;
                 var view = new DataView(data);
                 var opCode = view.getUint8(0);
-                log("opCode received: " + opCode);
 
                 if (opCode === 16) { // response
                     var resp_code = view.getUint8(2);
@@ -303,10 +301,19 @@
 
                     } else if (req_opcode === 4) {
                         log('complete, reset...');
-
+/*
+                        // Disconnect event currently not implemented
+                        controlChar.service.device.addEventListener("gattserverdisconnected", () => {
+                            resolve();
+                        });
+*/
                         controlChar.writeValue(new Uint8Array([5]))
                         .then(() => {
-                            resolve();
+                            // Hack to gracefully disconnect without disconnect event
+                            setTimeout(() => {
+                                chars.server.disconnect();
+                                resolve();
+                            }, 3000);
                         })
                         .catch(error => {
                             error = "error resetting: " + error;
