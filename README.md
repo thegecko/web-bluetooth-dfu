@@ -17,7 +17,7 @@ Then reset the device.
 
 Open this site in a Web Bluetooth enabled browser:
 
-[https://thegecko.github.io/web-bluetooth-dfu](https://thegecko.github.io/web-bluetooth-dfu)
+[https://thegecko.github.io/web-bluetooth-dfu/](https://thegecko.github.io/web-bluetooth-dfu/)
 
 ## Node Example
 
