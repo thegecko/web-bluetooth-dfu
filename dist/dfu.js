@@ -1,6 +1,32 @@
-/*
+/* @license
+ *
+ * Device firmware update with Web Bluetooth
+ * Version: 0.0.1
+ *
  * Protocol from:
  * http://developer.nordicsemi.com/nRF51_SDK/nRF51_SDK_v8.x.x/doc/8.1.0/s110/html/a00103.html
+ *
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2016 Rob Moran
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 // https://github.com/umdjs/umd
@@ -172,7 +198,7 @@
                 reject(error);
             });
         });
-    };
+    }
 
     var interval;
     var offset;
@@ -213,7 +239,7 @@
                 view.setUint32(8, appLength, littleEndian);
 
                 // Set firmware length
-                return packetChar.writeValue(view)
+                return packetChar.writeValue(view);
             })
             .then(() => {
                 log("sent buffer size: " + arrayBuffer.byteLength);
@@ -258,7 +284,7 @@
                         log('complete, send packet count');
 
                         var buffer = new ArrayBuffer(3);
-                        var view = new DataView(buffer);
+                        view = new DataView(buffer);
                         view.setUint8(0, 8);
                         view.setUint16(1, interval, littleEndian);
 
@@ -288,8 +314,8 @@
                         });
 
                     } else if (req_opcode === 7) {
-                        var bytecount = view.getUint32(3, littleEndian);
-                        log('length: ' + bytecount);
+                        var byteCount = view.getUint32(3, littleEndian);
+                        log('length: ' + byteCount);
                         log('complete, validate...');
 
                         controlChar.writeValue(new Uint8Array([4]))
@@ -323,8 +349,8 @@
                     }
 
                 } else if (opCode === 17) {
-                    var bytecount = view.getUint32(1, littleEndian);
-                    log('transferred: ' + bytecount);
+                    var bytes = view.getUint32(1, littleEndian);
+                    log('transferred: ' + bytes);
                     writePacket(packetChar, arrayBuffer, 0);
                 }
             }
