@@ -85,28 +85,28 @@
         });
     }
 
+    /**
+     * Switch to bootloader/DFU mode by writing to the control point of the DFU Service.
+     * The DFU Controller is not responsible for disconnecting from the application (DFU Target) after the write.
+     * The application (DFU Target) will issue a GAP Disconnect and reset into Bootloader/DFU mode.
+     */
     function writeMode(device) {
         return new Promise(function(resolve, reject) {
 /*
-            // Disconnect event currently not implemented
+            // Disconnect event currently not implemented...
             device.addEventListener("gattserverdisconnected", () => {
-                log("modeData written");
-                resolve();                
+                log("DFU Target issued GAP Disconnect and reset into Bootloader/DFU mode.");
+                resolve(device);                
             });
 */
             connect(device)
             .then(chars => {
-                log("writing modeData...");
-                chars.controlChar.writeValue(new Uint8Array([1]));
-
-                // Hack to gracefully disconnect without disconnect event
-                setTimeout(() => {
-                    chars.server.disconnect();
-                    setTimeout(() => {
-                        log("modeData written");
-                        resolve(device);
-                    }, 3000);
-                }, 3000);
+                log("Writing modeData...");
+                return chars.controlChar.writeValue(new Uint8Array([1]))
+                .then(() => {
+                    log("modeData Written.");
+                    resolve(device); // Once disconnect event is implemented we should resolve in its callback...
+                });
             })
             .catch(error => {
                 error = "writeMode error: " + error;
