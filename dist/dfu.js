@@ -122,16 +122,18 @@
 
             connect(device)
             .then(chars => {
+                // Older DFU implementations (from older Nordic SDKs < 7.0) have no DFU Version characteristic.
                 if (chars.versionChar) {
                     return chars.versionChar.readValue()
                     .then(data => {
+                        console.log('read versionChar');
                         var view = new DataView(data);
                         var major = view.getUint8(0);
                         var minor = view.getUint8(1);
                         return transfer(chars, arrayBuffer, imageType, major, minor);
                     });
                 } else {
-                    // Default to version 6.0
+                    // Default to version 6.0 (mbed).
                     return transfer(chars, arrayBuffer, imageType, 6, 0);
                 }
             })
@@ -183,12 +185,14 @@
                 log("found packet characteristic");
                 packetChar = characteristic;
                 service.getCharacteristic(versionUUID)
-                .then(characteristic => {
+                .then(characteristic => { // Older DFU implementations (from older Nordic SDKs) have no DFU Version characteristic. So this may fail.
                     log("found version characteristic");
                     versionChar = characteristic;
                     complete();
                 })
                 .catch(error => {
+                    error += ' no version charactersitic found';
+                    log(error);
                     complete();
                 });
             })
