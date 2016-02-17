@@ -14,6 +14,7 @@
 
     <script>
         var urlMask = "//thegecko.github.io/web-bluetooth-dfu/firmware/NRF51822_{0}_Rob_OTA.hex";
+        var urlMask52 = "https://raw.githubusercontent.com/mjdietzx/web-bluetooth-dfu/develop/firmware/ble_app_hrs_with_dfu_nrf52.hex";
         var resultsEl = document.getElementById("results");
 
         function log(message) {
@@ -35,7 +36,8 @@
 
         function transfer(device) {
             return new Promise(function(resolve, reject) {
-                var url = urlMask.replace("{0}", device.name === "Hi_Rob" ? "Bye" : "Hi");
+                //var url = urlMask.replace("{0}", device.name === "Hi_Rob" ? "Bye" : "Hi");
+                var url = urlMask52; // nRF52832 application (example BLE heart rate from Nordic SDK) for DFU OTA update.
 
                 download(url)
                 .then(hex => {

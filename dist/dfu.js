@@ -131,6 +131,17 @@
             }
         });
     }
+    
+    /**
+     * Contains basic functionality for performing safety checks on software updates for nRF5 based devices.
+     * Init packet used for pre-checking to ensure the following image is compatible with the device.
+     * Contains information on device type, revision, and supported SoftDevices along with a CRC or hash of firmware image.
+     * 
+     * Not used in mbed bootloader.
+     */
+    function generateInitPacket() {
+        return new Uint8Array([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x00, 0xFE, 0xFF, 0x00, 0x00]); // Temporary init packet.
+    }
 
     function provision(device, arrayBuffer, imageType) {
         return new Promise(function(resolve, reject) {
@@ -289,11 +300,11 @@
 
                     var req_opcode = view.getUint8(1);
                     if (req_opcode === 1 && majorVersion > 6) {
-                        log('write null init packet');
+                        log('write init packet');
 
                         controlChar.writeValue(new Uint8Array([2,0]))
                         .then(() => {
-                            return packetChar.writeValue(new Uint8Array([0]));
+                            return packetChar.writeValue(generateInitPacket());
                         })
                         .then(() => {
                             return controlChar.writeValue(new Uint8Array([2,1]));
