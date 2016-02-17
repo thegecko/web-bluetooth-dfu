@@ -397,6 +397,7 @@
                         controlChar.writeValue(new Uint8Array([5]))
                         .then(() => {
                             log('image activated and dfu target reset');
+                            resolve(); // TODO: Resolve in disconnect event handler when implemented in Web Bluetooth API.
                         })
                         .catch(error => {
                             error = "error resetting: " + error;
