@@ -61,6 +61,16 @@
         SoftDevice_Bootloader: 3,
         Application: 4
     };
+    
+    // TODO: This should be configurable by the user. For now this will work with any of Nordic's SDK examples.
+    var initPacket = {
+        device_type: 0xFFFF,
+        device_rev: 0xFFFF,
+        app_version: 0xFFFFFFFF,
+        softdevice_len: 0x0001,
+        softdevice: 0xFFFE,
+        crc: 0x0000
+    };
 
     var loggers = [];
     function addLogger(loggerFn) {
@@ -90,7 +100,7 @@
      */
     function writeMode(device) {
         return new Promise(function(resolve, reject) {
-            var characteristics = null;
+            var controlChar = null;
 /*
             // Disconnect event currently not implemented...
             device.addEventListener("gattserverdisconnected", () => {
@@ -102,15 +112,15 @@
             connect(device)
             .then(chars => {
                 log("enabling notifications");
-                characteristics = chars;
-                return characteristics.controlChar.startNotifications()
+                controlChar = chars.controlChar;
+                return controlChar.startNotifications()
                 .then(() => {
-                    characteristics.controlChar.addEventListener('characteristicvaluechanged', handleNotifications);
+                    controlChar.addEventListener('characteristicvaluechanged', handleNotifications);
                 });
             })
             .then(() => {
                 log("writing modeData");
-                return characteristics.controlChar.writeValue(new Uint8Array([1, 4]))
+                return controlChar.writeValue(new Uint8Array([1, 4]))
                 .then(() => {
                     log("modeData written");
                     resolve(device); // TODO: once disconnect event is implemented we should resolve in its callback...
@@ -133,23 +143,30 @@
      * Init packet used for pre-checking to ensure the following image is compatible with the device.
      * Contains information on device type, revision, and supported SoftDevices along with a CRC or hash of firmware image.
      * 
-     * Not used in mbed bootloader.
+     * Not used in mbed bootloader (init packet was optional in SDK v6.x).
      */
     function generateInitPacket() {
-        return new Uint8Array([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x00, 0xFE, 0xFF, 0x00, 0x00]); // Temporary init packet.
+        var buffer = new ArrayBuffer(14);
+        var view = new DataView(buffer);
+        view.setUint16(0, initPacket.device_type, LITTLE_ENDIAN);
+        view.setUint16(2, initPacket.device_rev, LITTLE_ENDIAN);
+        view.setUint32(4, initPacket.app_version, LITTLE_ENDIAN); // Application version for the image software. This field allows for additional checking, for example ensuring that a downgrade is not allowed.
+        view.setUint16(8, initPacket.softdevice_len, LITTLE_ENDIAN); // Number of different SoftDevice revisions compatible with this application.
+        view.setUint16(10, initPacket.softdevice, LITTLE_ENDIAN); // Variable length array of SoftDevices compatible with this application. The length of the array is specified in the length (softdevice_len) field. 0xFFFE indicates any SoftDevice.
+        view.setUint16(12, initPacket.crc, LITTLE_ENDIAN);
+        return view;
     }
 
     function provision(device, arrayBuffer, imageType) {
         return new Promise(function(resolve, reject) {
-            log('function provision(device, arrayBuffer, imageType)');
-            
+            var versionChar = null;
             imageType = imageType || ImageType.Application;
 
             connect(device)
             .then(chars => {
-                // Older DFU implementations (from older Nordic SDKs < 7.0) have no DFU Version characteristic.
-                if (chars.versionChar) {
-                    return chars.versionChar.readValue()
+                versionChar = chars.versionChar;
+                if (versionChar) { // Older DFU implementations (from older Nordic SDKs < 7.0) have no DFU Version characteristic.
+                    return versionChar.readValue()
                     .then(data => {
                         console.log('read versionChar');
                         var view = new DataView(data);
@@ -174,8 +191,6 @@
 
     function connect(device) {
         return new Promise(function(resolve, reject) {
-            log('function connect(device)');
-            
             var server = null;
             var service = null;
             var controlChar = null;
