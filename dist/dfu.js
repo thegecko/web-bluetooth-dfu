@@ -71,6 +71,20 @@
         softdevice: 0xFFFE,
         crc: 0x0000
     };
+    
+    var OPCODE = {
+        RESERVED: 0,
+        START_DFU: 1,
+        INITIALIZE_DFU_PARAMETERS: 2,
+        RECEIVE_FIRMWARE_IMAGE: 3,
+        VALIDATE_FIRMWARE: 4,
+        ACTIVATE_IMAGE_AND_RESET: 5,
+        RESET_SYSTEM: 6,
+        REPORT_RECEIVED_IMAGE_SIZE: 7,
+        PACKET_RECEIPT_NOTIFICATION_REQUEST: 8,
+        RESPONSE_CODE: 16,
+        PACKET_RECEIPT_NOTIFICATION: 17
+    };
 
     var loggers = [];
     function addLogger(loggerFn) {
@@ -299,18 +313,19 @@
             function handleControl(event) {
                 var data = event.target.value;
                 var view = new DataView(data);
+                
                 var opCode = view.getUint8(0);
+                var req_opcode = view.getUint8(1);
+                var resp_code = view.getUint8(2);
 
-                if (opCode === 16) { // response
-                    var resp_code = view.getUint8(2);
+                if (opCode === 16) { // Response Code.
                     if (resp_code !== 1) {
                         var error = "error from control: " + resp_code;
                         log(error);
                         return reject(error);
                     }
 
-                    var req_opcode = view.getUint8(1);
-                    if (req_opcode === 1 && majorVersion > 6) {
+                    if (req_opcode === OPCODE.START_DFU && majorVersion > 6) {
                         log('write init packet');
 
                         controlChar.writeValue(new Uint8Array([2,0]))
@@ -326,7 +341,7 @@
                             reject(error);
                         });
 
-                    } else if (req_opcode === 1 || req_opcode === 2) {
+                    } else if (req_opcode === OPCODE.START_DFU || req_opcode === OPCODE.INITIALIZE_DFU_PARAMETERS) {
                         log('complete, send packet count');
 
                         var buffer = new ArrayBuffer(3);
@@ -349,7 +364,7 @@
                             reject(error);
                         });
 
-                    } else if (req_opcode === 3) {
+                    } else if (req_opcode === OPCODE.RECEIVE_FIRMWARE_IMAGE) {
                         log('complete, check length');
 
                         controlChar.writeValue(new Uint8Array([7]))
@@ -359,7 +374,7 @@
                             reject(error);
                         });
 
-                    } else if (req_opcode === 7) {
+                    } else if (req_opcode === OPCODE.REPORT_RECEIVED_IMAGE_SIZE) {
                         var byteCount = view.getUint32(3, LITTLE_ENDIAN);
                         log('length: ' + byteCount);
                         log('complete, validate...');
@@ -371,7 +386,7 @@
                             reject(error);
                         });
 
-                    } else if (req_opcode === 4) {
+                    } else if (req_opcode === OPCODE.VALIDATE_FIRMWARE) {
                         log('complete, reset...');
 /*
                         // Disconnect event currently not implemented
@@ -394,7 +409,7 @@
                         });
                     }
 
-                } else if (opCode === 17) {
+                } else if (opCode === OPCODE.PACKET_RECEIPT_NOTIFICATION) { // Packet Receipt Notification.
                     var bytes = view.getUint32(1, LITTLE_ENDIAN);
                     log('transferred: ' + bytes);
                     writePacket(packetChar, arrayBuffer, 0);
