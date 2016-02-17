@@ -88,24 +88,36 @@
     /**
      * Switch to bootloader/DFU mode by writing to the control point of the DFU Service.
      * The DFU Controller is not responsible for disconnecting from the application (DFU Target) after the write.
-     * The application (DFU Target) will issue a GAP Disconnect and reset into Bootloader/DFU mode.
+     * The application (DFU Target) will issue a GAP Disconnect and reset into bootloader/DFU mode.
+     * 
+     * https://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v11.0.0/bledfu_appswitching.html?cp=4_0_0_4_1_3_2_2
      */
     function writeMode(device) {
         return new Promise(function(resolve, reject) {
+            var characteristics = null;
 /*
             // Disconnect event currently not implemented...
             device.addEventListener("gattserverdisconnected", () => {
                 log("DFU Target issued GAP Disconnect and reset into Bootloader/DFU mode.");
                 resolve(device);                
             });
+            
 */
             connect(device)
             .then(chars => {
-                log("Writing modeData...");
-                return chars.controlChar.writeValue(new Uint8Array([1]))
+                log("enabling notifications");
+                characteristics = chars;
+                return characteristics.controlChar.startNotifications()
                 .then(() => {
-                    log("modeData Written.");
-                    resolve(device); // Once disconnect event is implemented we should resolve in its callback...
+                    characteristics.controlChar.addEventListener('characteristicvaluechanged', handleNotifications);
+                });
+            })
+            .then(() => {
+                log("writing modeData");
+                return characteristics.controlChar.writeValue(new Uint8Array([1, 4]))
+                .then(() => {
+                    log("modeData written");
+                    resolve(device); // TODO: once disconnect event is implemented we should resolve in its callback...
                 });
             })
             .catch(error => {
@@ -113,11 +125,17 @@
                 log(error);
                 reject(error);
             });
+            
+            function handleNotifications(event) {
+                log('received notification on control characteristic - ERROR this should not happen');
+            }
         });
     }
 
     function provision(device, arrayBuffer, imageType) {
         return new Promise(function(resolve, reject) {
+            log('function provision(device, arrayBuffer, imageType)');
+            
             imageType = imageType || ImageType.Application;
 
             connect(device)
@@ -149,6 +167,8 @@
 
     function connect(device) {
         return new Promise(function(resolve, reject) {
+            log('function connect(device)');
+            
             var server = null;
             var service = null;
             var controlChar = null;
