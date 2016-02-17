@@ -396,11 +396,7 @@
 */
                         controlChar.writeValue(new Uint8Array([5]))
                         .then(() => {
-                            // Hack to gracefully disconnect without disconnect event
-                            setTimeout(() => {
-                                chars.server.disconnect();
-                                resolve();
-                            }, 3000);
+                            log('image activated and dfu target reset');
                         })
                         .catch(error => {
                             error = "error resetting: " + error;
