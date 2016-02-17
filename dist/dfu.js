@@ -44,6 +44,8 @@
 }(this, function(Promise, bluetooth) {
     "use strict";
 
+    var LITTLE_ENDIAN = true;
+    
     var packetSize = 20;
     var notifySteps = 40;
 
@@ -59,12 +61,6 @@
         SoftDevice_Bootloader: 3,
         Application: 4
     };
-
-    var littleEndian = (function() {
-        var buffer = new ArrayBuffer(2);
-        new DataView(buffer).setInt16(0, 256, true);
-        return new Int16Array(buffer)[0] === 256;
-    })();
 
     var loggers = [];
     function addLogger(loggerFn) {
@@ -269,9 +265,9 @@
 
                 var buffer = new ArrayBuffer(12);
                 var view = new DataView(buffer);
-                view.setUint32(0, softLength, littleEndian);
-                view.setUint32(4, bootLength, littleEndian);
-                view.setUint32(8, appLength, littleEndian);
+                view.setUint32(0, softLength, LITTLE_ENDIAN);
+                view.setUint32(4, bootLength, LITTLE_ENDIAN);
+                view.setUint32(8, appLength, LITTLE_ENDIAN);
 
                 // Set firmware length
                 return packetChar.writeValue(view);
@@ -321,7 +317,7 @@
                         var buffer = new ArrayBuffer(3);
                         view = new DataView(buffer);
                         view.setUint8(0, 8);
-                        view.setUint16(1, interval, littleEndian);
+                        view.setUint16(1, interval, LITTLE_ENDIAN);
 
                         controlChar.writeValue(view)
                         .then(() => {
@@ -349,7 +345,7 @@
                         });
 
                     } else if (req_opcode === 7) {
-                        var byteCount = view.getUint32(3, littleEndian);
+                        var byteCount = view.getUint32(3, LITTLE_ENDIAN);
                         log('length: ' + byteCount);
                         log('complete, validate...');
 
@@ -384,7 +380,7 @@
                     }
 
                 } else if (opCode === 17) {
-                    var bytes = view.getUint32(1, littleEndian);
+                    var bytes = view.getUint32(1, LITTLE_ENDIAN);
                     log('transferred: ' + bytes);
                     writePacket(packetChar, arrayBuffer, 0);
                 }
