@@ -280,7 +280,7 @@
             .then(() => {
                 controlChar.addEventListener('characteristicvaluechanged', handleControl);
                 log("sending imagetype: " + imageType);
-                return controlChar.writeValue(new Uint8Array([1, imageType]));
+                return controlChar.writeValue(new Uint8Array([OPCODE.START_DFU, imageType]));
             })
             .then(() => {
                 log("sent start");
@@ -295,11 +295,10 @@
                 view.setUint32(4, bootLength, LITTLE_ENDIAN);
                 view.setUint32(8, appLength, LITTLE_ENDIAN);
 
-                // Set firmware length
                 return packetChar.writeValue(view);
             })
             .then(() => {
-                log("sent buffer size: " + arrayBuffer.byteLength);
+                log("sent image size: " + arrayBuffer.byteLength);
             })
             .catch(error => {
                 error = "start error: " + error;
@@ -317,7 +316,7 @@
 
                 if (opCode === OPCODE.RESPONSE_CODE) {
                     if (resp_code !== 1) {
-                        var err = "error from control: " + resp_code;
+                        var err = "error from control point notification, resp_code: " + resp_code;
                         log(err);
                         return reject(err);
                     }
@@ -330,15 +329,15 @@
                               break;
                             }
                             
-                            controlChar.writeValue(new Uint8Array([2,0]))
+                            controlChar.writeValue(new Uint8Array([OPCODE.INITIALIZE_DFU_PARAMETERS, 0]))
                             .then(() => {
                                 return packetChar.writeValue(generateInitPacket());
                             })
                             .then(() => {
-                                return controlChar.writeValue(new Uint8Array([2,1]));
+                                return controlChar.writeValue(new Uint8Array([OPCODE.INITIALIZE_DFU_PARAMETERS, 1]));
                             })
                             .catch(error => {
-                                error = "error writing init: " + error;
+                                error = "error writing dfu init parameters: " + error;
                                 log(error);
                                 reject(error);
                             });
@@ -348,13 +347,13 @@
 
                             var buffer = new ArrayBuffer(3);
                             view = new DataView(buffer);
-                            view.setUint8(0, 8);
+                            view.setUint8(0, OPCODE.PACKET_RECEIPT_NOTIFICATION_REQUEST);
                             view.setUint16(1, interval, LITTLE_ENDIAN);
     
                             controlChar.writeValue(view)
                             .then(() => {
                                 log("sent packet count: " + interval);
-                                return controlChar.writeValue(new Uint8Array([3]));
+                                return controlChar.writeValue(new Uint8Array([OPCODE.RECEIVE_FIRMWARE_IMAGE]));
                             })
                             .then(() => {
                                 log("sent receive");
@@ -369,7 +368,7 @@
                         case OPCODE.RECEIVE_FIRMWARE_IMAGE:
                             log('check length');
 
-                            controlChar.writeValue(new Uint8Array([7]))
+                            controlChar.writeValue(new Uint8Array([OPCODE.REPORT_RECEIVED_IMAGE_SIZE]))
                             .catch(error => {
                                 error = "error checking length: " + error;
                                 log(error);
@@ -377,11 +376,11 @@
                             });
                             break;
                         case OPCODE.REPORT_RECEIVED_IMAGE_SIZE:
-                            var byteCount = view.getUint32(3, LITTLE_ENDIAN);
-                            log('length: ' + byteCount);
+                            var bytesReceived = view.getUint32(3, LITTLE_ENDIAN);
+                            log('length: ' + bytesReceived);
                             log('validate...');
     
-                            controlChar.writeValue(new Uint8Array([4]))
+                            controlChar.writeValue(new Uint8Array([OPCODE.VALIDATE_FIRMWARE]))
                             .catch(error => {
                                 error = "error validating: " + error;
                                 log(error);
@@ -396,7 +395,7 @@
                                 resolve();
                             });
 */
-                            controlChar.writeValue(new Uint8Array([5]))
+                            controlChar.writeValue(new Uint8Array([OPCODE.ACTIVATE_IMAGE_AND_RESET]))
                             .then(() => {
                                 log('image activated and dfu target reset');
                                 resolve(); // TODO: Resolve in disconnect event handler when implemented in Web Bluetooth API.
