@@ -325,7 +325,7 @@
                         case OPCODE.START_DFU:
                             log('write init packet');
     
-                            if(majorVersion >= 6) { // init packet is not used in SDK v6 (so not used in mbed).
+                            if(majorVersion <= 6) { // init packet is not used in SDK v6 (so not used in mbed).
                               break;
                             }
                             
