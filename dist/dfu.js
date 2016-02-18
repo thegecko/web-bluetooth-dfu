@@ -321,86 +321,95 @@
                         log(err);
                         return reject(err);
                     }
+                    
+                    switch(req_opcode) {
+                        case OPCODE.START_DFU:
+                            log('write init packet');
+    
+                            if(majorVersion >= 6) { // init packet is not used in SDK v6 (so not used in mbed).
+                              break;
+                            }
+                            
+                            controlChar.writeValue(new Uint8Array([2,0]))
+                            .then(() => {
+                                return packetChar.writeValue(generateInitPacket());
+                            })
+                            .then(() => {
+                                return controlChar.writeValue(new Uint8Array([2,1]));
+                            })
+                            .catch(error => {
+                                error = "error writing init: " + error;
+                                log(error);
+                                reject(error);
+                            });
+                            break;
+                        case OPCODE.INITIALIZE_DFU_PARAMETERS:
+                            log('send packet count');
 
-                    if (req_opcode === OPCODE.START_DFU && majorVersion > 6) {
-                        log('write init packet');
+                            var buffer = new ArrayBuffer(3);
+                            view = new DataView(buffer);
+                            view.setUint8(0, 8);
+                            view.setUint16(1, interval, LITTLE_ENDIAN);
+    
+                            controlChar.writeValue(view)
+                            .then(() => {
+                                log("sent packet count: " + interval);
+                                return controlChar.writeValue(new Uint8Array([3]));
+                            })
+                            .then(() => {
+                                log("sent receive");
+                                return writePacket(packetChar, arrayBuffer, 0);
+                            })
+                            .catch(error => {
+                                error = "error sending packet count: " + error;
+                                log(error);
+                                reject(error);
+                            });
+                            break;
+                        case OPCODE.RECEIVE_FIRMWARE_IMAGE:
+                            log('check length');
 
-                        controlChar.writeValue(new Uint8Array([2,0]))
-                        .then(() => {
-                            return packetChar.writeValue(generateInitPacket());
-                        })
-                        .then(() => {
-                            return controlChar.writeValue(new Uint8Array([2,1]));
-                        })
-                        .catch(error => {
-                            error = "error writing init: " + error;
-                            log(error);
-                            reject(error);
-                        });
-
-                    } else if (req_opcode === OPCODE.START_DFU || req_opcode === OPCODE.INITIALIZE_DFU_PARAMETERS) {
-                        log('complete, send packet count');
-
-                        var buffer = new ArrayBuffer(3);
-                        view = new DataView(buffer);
-                        view.setUint8(0, 8);
-                        view.setUint16(1, interval, LITTLE_ENDIAN);
-
-                        controlChar.writeValue(view)
-                        .then(() => {
-                            log("sent packet count: " + interval);
-                            return controlChar.writeValue(new Uint8Array([3]));
-                        })
-                        .then(() => {
-                            log("sent receive");
-                            return writePacket(packetChar, arrayBuffer, 0);
-                        })
-                        .catch(error => {
-                            error = "error sending packet count: " + error;
-                            log(error);
-                            reject(error);
-                        });
-
-                    } else if (req_opcode === OPCODE.RECEIVE_FIRMWARE_IMAGE) {
-                        log('complete, check length');
-
-                        controlChar.writeValue(new Uint8Array([7]))
-                        .catch(error => {
-                            error = "error checking length: " + error;
-                            log(error);
-                            reject(error);
-                        });
-
-                    } else if (req_opcode === OPCODE.REPORT_RECEIVED_IMAGE_SIZE) {
-                        var byteCount = view.getUint32(3, LITTLE_ENDIAN);
-                        log('length: ' + byteCount);
-                        log('complete, validate...');
-
-                        controlChar.writeValue(new Uint8Array([4]))
-                        .catch(error => {
-                            error = "error validating: " + error;
-                            log(error);
-                            reject(error);
-                        });
-
-                    } else if (req_opcode === OPCODE.VALIDATE_FIRMWARE) {
-                        log('complete, reset...');
+                            controlChar.writeValue(new Uint8Array([7]))
+                            .catch(error => {
+                                error = "error checking length: " + error;
+                                log(error);
+                                reject(error);
+                            });
+                            break;
+                        case OPCODE.REPORT_RECEIVED_IMAGE_SIZE:
+                            var byteCount = view.getUint32(3, LITTLE_ENDIAN);
+                            log('length: ' + byteCount);
+                            log('validate...');
+    
+                            controlChar.writeValue(new Uint8Array([4]))
+                            .catch(error => {
+                                error = "error validating: " + error;
+                                log(error);
+                                reject(error);
+                            });
+                            break;
+                        case OPCODE.VALIDATE_FIRMWARE:
+                            log('complete, reset...');
 /*
-                        // Disconnect event currently not implemented
-                        controlChar.service.device.addEventListener("gattserverdisconnected", () => {
-                            resolve();
-                        });
+                            // Disconnect event currently not implemented
+                            controlChar.service.device.addEventListener("gattserverdisconnected", () => {
+                                resolve();
+                            });
 */
-                        controlChar.writeValue(new Uint8Array([5]))
-                        .then(() => {
-                            log('image activated and dfu target reset');
-                            resolve(); // TODO: Resolve in disconnect event handler when implemented in Web Bluetooth API.
-                        })
-                        .catch(error => {
-                            error = "error resetting: " + error;
-                            log(error);
-                            reject(error);
-                        });
+                            controlChar.writeValue(new Uint8Array([5]))
+                            .then(() => {
+                                log('image activated and dfu target reset');
+                                resolve(); // TODO: Resolve in disconnect event handler when implemented in Web Bluetooth API.
+                            })
+                            .catch(error => {
+                                error = "error resetting: " + error;
+                                log(error);
+                                reject(error);
+                            });
+                            break;
+                        default:
+                            log('unexpected req opCode - ERROR');
+                            break;
                     }
 
                 } else if (opCode === OPCODE.PACKET_RECEIPT_NOTIFICATION) {
