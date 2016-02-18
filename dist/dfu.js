@@ -270,9 +270,9 @@
             offset = 0;
 
             if (!controlChar.properties.notify) {
-                var error = "controlChar missing notify property";
-                log(error);
-                return reject(error);
+                var err = "controlChar missing notify property";
+                log(err);
+                return reject(err);
             }
 
             log("enabling notifications");
@@ -317,9 +317,9 @@
 
                 if (opCode === OPCODE.RESPONSE_CODE) {
                     if (resp_code !== 1) {
-                        var error = "error from control: " + resp_code;
-                        log(error);
-                        return reject(error);
+                        var err = "error from control: " + resp_code;
+                        log(err);
+                        return reject(err);
                     }
 
                     if (req_opcode === OPCODE.START_DFU && majorVersion > 6) {
