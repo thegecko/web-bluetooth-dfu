@@ -121,31 +121,28 @@
                 log("DFU Target issued GAP Disconnect and reset into Bootloader/DFU mode.");
                 resolve(device);                
             });
-            
 */
             connect(device)
             .then(chars => {
                 log("enabling notifications");
                 controlChar = chars.controlChar;
-                return controlChar.startNotifications()
-                .then(() => {
-                    controlChar.addEventListener('characteristicvaluechanged', handleNotifications);
-                });
+                return controlChar.startNotifications();
             })
             .then(() => {
                 log("writing modeData");
-                return controlChar.writeValue(new Uint8Array([1, 4]))
-                .then(() => {
-                    log("modeData written");
-                    resolve(device); // TODO: once disconnect event is implemented we should resolve in its callback...
-                });
+                controlChar.addEventListener('characteristicvaluechanged', handleNotifications);
+                return controlChar.writeValue(new Uint8Array([1, 4]));
+            })
+            .then(() => {
+                log("modeData written");
+                resolve(device); // TODO: once disconnect event is implemented we should resolve in its callback...
             })
             .catch(error => {
                 error = "writeMode error: " + error;
                 log(error);
                 reject(error);
             });
-            
+
             function handleNotifications(event) {
                 log('received notification on control characteristic - ERROR this should not happen');
             }
@@ -241,9 +238,9 @@
                 log("found packet characteristic");
                 packetChar = characteristic;
                 service.getCharacteristic(versionUUID)
-                .then(characteristic => { // Older DFU implementations (from older Nordic SDKs) have no DFU Version characteristic. So this may fail.
+                .then(char => { // Older DFU implementations (from older Nordic SDKs) have no DFU Version characteristic. So this may fail.
                     log("found version characteristic");
-                    versionChar = characteristic;
+                    versionChar = char;
                     complete();
                 })
                 .catch(error => {
@@ -318,7 +315,7 @@
                 var req_opcode = view.getUint8(1);
                 var resp_code = view.getUint8(2);
 
-                if (opCode === 16) { // Response Code.
+                if (opCode === OPCODE.RESPONSE_CODE) {
                     if (resp_code !== 1) {
                         var error = "error from control: " + resp_code;
                         log(error);
@@ -406,7 +403,7 @@
                         });
                     }
 
-                } else if (opCode === OPCODE.PACKET_RECEIPT_NOTIFICATION) { // Packet Receipt Notification.
+                } else if (opCode === OPCODE.PACKET_RECEIPT_NOTIFICATION) {
                     var bytes = view.getUint32(1, LITTLE_ENDIAN);
                     log('transferred: ' + bytes);
                     writePacket(packetChar, arrayBuffer, 0);
