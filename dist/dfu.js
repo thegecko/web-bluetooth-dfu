@@ -130,7 +130,6 @@
             })
             .then(() => {
                 log("writing modeData");
-                controlChar.addEventListener('characteristicvaluechanged', handleNotifications);
                 return controlChar.writeValue(new Uint8Array([1, 4]));
             })
             .then(() => {
@@ -142,10 +141,6 @@
                 log(error);
                 reject(error);
             });
-
-            function handleNotifications(event) {
-                log('received notification on control characteristic - ERROR this should not happen');
-            }
         });
     }
     
@@ -217,7 +212,7 @@
                 });
             }
 
-            device.connectGATT()
+            device.gatt.connect()
             .then(gattServer => {
                 // Connected
                 server = gattServer;
