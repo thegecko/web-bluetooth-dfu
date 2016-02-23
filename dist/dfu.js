@@ -211,7 +211,7 @@
                 });
             }
 
-            device.gatt.connect()
+            device.connectGATT()
             .then(gattServer => {
                 // Connected
                 server = gattServer;
@@ -302,10 +302,11 @@
 
             function handleControl(event) {
                 var data = event.target.value;
+                var view = new DataView(data);
                 
-                var opCode = data.getUint8(0);
-                var req_opcode = data.getUint8(1);
-                var resp_code = data.getUint8(2);
+                var opCode = view.getUint8(0);
+                var req_opcode = view.getUint8(1);
+                var resp_code = view.getUint8(2);
 
                 if (opCode === OPCODE.RESPONSE_CODE) {
                     if (resp_code !== 1) {
@@ -337,7 +338,7 @@
                             log('send packet count');
 
                             var buffer = new ArrayBuffer(3);
-                            var view = new DataView(buffer);
+                            view = new DataView(buffer);
                             view.setUint8(0, OPCODE.PACKET_RECEIPT_NOTIFICATION_REQUEST);
                             view.setUint16(1, interval, LITTLE_ENDIAN);
     
@@ -367,7 +368,7 @@
                             });
                             break;
                         case OPCODE.REPORT_RECEIVED_IMAGE_SIZE:
-                            var bytesReceived = data.getUint32(3, LITTLE_ENDIAN);
+                            var bytesReceived = view.getUint32(3, LITTLE_ENDIAN);
                             log('length: ' + bytesReceived);
                             log('validate...');
     
@@ -403,7 +404,7 @@
                     }
 
                 } else if (opCode === OPCODE.PACKET_RECEIPT_NOTIFICATION) {
-                    var bytes = data.getUint32(1, LITTLE_ENDIAN);
+                    var bytes = view.getUint32(1, LITTLE_ENDIAN);
                     log('transferred: ' + bytes);
                     writePacket(packetChar, arrayBuffer, 0);
                 }
