@@ -316,26 +316,24 @@
                     
                     switch(req_opcode) {
                         case OPCODE.START_DFU:
-                            log('write init packet');
-    
-                            if(majorVersion <= 6) { // init packet is not used in SDK v6 (so not used in mbed).
-                              break;
-                            }
-                            
-                            controlChar.writeValue(new Uint8Array([OPCODE.INITIALIZE_DFU_PARAMETERS, 0]))
-                            .then(() => {
-                                return packetChar.writeValue(generateInitPacket());
-                            })
-                            .then(() => {
-                                return controlChar.writeValue(new Uint8Array([OPCODE.INITIALIZE_DFU_PARAMETERS, 1]));
-                            })
-                            .catch(error => {
-                                error = "error writing dfu init parameters: " + error;
-                                log(error);
-                                reject(error);
-                            });
-                            break;
                         case OPCODE.INITIALIZE_DFU_PARAMETERS:
+                            if(req_opcode === OPCODE.START_DFU && majorVersion > 6) { // init packet is not used in SDK v6 (so not used in mbed).
+                                log('write init packet');
+                                controlChar.writeValue(new Uint8Array([OPCODE.INITIALIZE_DFU_PARAMETERS, 0]))
+                                .then(() => {
+                                    return packetChar.writeValue(generateInitPacket());
+                                })
+                                .then(() => {
+                                    return controlChar.writeValue(new Uint8Array([OPCODE.INITIALIZE_DFU_PARAMETERS, 1]));
+                                })
+                                .catch(error => {
+                                    error = "error writing dfu init parameters: " + error;
+                                    log(error);
+                                    reject(error);
+                                });
+                                break;
+                            }
+ 
                             log('send packet count');
 
                             var buffer = new ArrayBuffer(3);
