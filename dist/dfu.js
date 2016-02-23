@@ -175,9 +175,8 @@
                     return versionChar.readValue()
                     .then(data => {
                         console.log('read versionChar');
-                        var view = new DataView(data);
-                        var major = view.getUint8(0);
-                        var minor = view.getUint8(1);
+                        var major = data.getUint8(0);
+                        var minor = data.getUint8(1);
                         return transfer(chars, arrayBuffer, imageType, major, minor);
                     });
                 } else {
@@ -233,9 +232,9 @@
                 log("found packet characteristic");
                 packetChar = characteristic;
                 service.getCharacteristic(versionUUID)
-                .then(char => { // Older DFU implementations (from older Nordic SDKs) have no DFU Version characteristic. So this may fail.
+                .then(characteristic => { // Older DFU implementations (from older Nordic SDKs) have no DFU Version characteristic. So this may fail.
                     log("found version characteristic");
-                    versionChar = char;
+                    versionChar = characteristic;
                     complete();
                 })
                 .catch(error => {
@@ -303,11 +302,10 @@
 
             function handleControl(event) {
                 var data = event.target.value;
-                var view = new DataView(data);
                 
-                var opCode = view.getUint8(0);
-                var req_opcode = view.getUint8(1);
-                var resp_code = view.getUint8(2);
+                var opCode = data.getUint8(0);
+                var req_opcode = data.getUint8(1);
+                var resp_code = data.getUint8(2);
 
                 if (opCode === OPCODE.RESPONSE_CODE) {
                     if (resp_code !== 1) {
@@ -341,7 +339,7 @@
                             log('send packet count');
 
                             var buffer = new ArrayBuffer(3);
-                            view = new DataView(buffer);
+                            var view = new DataView(buffer);
                             view.setUint8(0, OPCODE.PACKET_RECEIPT_NOTIFICATION_REQUEST);
                             view.setUint16(1, interval, LITTLE_ENDIAN);
     
@@ -371,7 +369,7 @@
                             });
                             break;
                         case OPCODE.REPORT_RECEIVED_IMAGE_SIZE:
-                            var bytesReceived = view.getUint32(3, LITTLE_ENDIAN);
+                            var bytesReceived = data.getUint32(3, LITTLE_ENDIAN);
                             log('length: ' + bytesReceived);
                             log('validate...');
     
@@ -407,7 +405,7 @@
                     }
 
                 } else if (opCode === OPCODE.PACKET_RECEIPT_NOTIFICATION) {
-                    var bytes = view.getUint32(1, LITTLE_ENDIAN);
+                    var bytes = data.getUint32(1, LITTLE_ENDIAN);
                     log('transferred: ' + bytes);
                     writePacket(packetChar, arrayBuffer, 0);
                 }
