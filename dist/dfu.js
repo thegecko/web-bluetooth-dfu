@@ -93,7 +93,7 @@
         }
     }
     function log(message) {
-        loggers.forEach(logger => {
+        loggers.forEach(function(logger) {
             logger(message);
         });
     }
@@ -116,7 +116,7 @@
         return new Promise(function(resolve, reject) {
 /*
             // TODO: once disconnect event is implemented we should resolve in its callback...
-            device.addEventListener("gattserverdisconnected", () => {
+            device.addEventListener("gattserverdisconnected", function() {
                 log("DFU Target issued GAP Disconnect and reset into Bootloader/DFU mode.");
                 resolve(device);                
             });
@@ -124,24 +124,24 @@
             var characteristics = null;
 
             connect(device)
-            .then(chars => {
+            .then(function(chars) {
                 log("enabling notifications");
                 characteristics = chars;
                 return characteristics.controlChar.startNotifications();
             })
-            .then(() => {
+            .then(function() {
                 log("writing modeData");
                 return characteristics.controlChar.writeValue(new Uint8Array([1, 4]));
             })
-            .then(() => {
+            .then(function() {
                 log("modeData written");
                 // Hack to gracefully disconnect without disconnect event
-                setTimeout(() => {
+                setTimeout(function() {
                     characteristics.server.disconnect();
                     resolve(device);
                 }, 2000);
             })
-            .catch(error => {
+            .catch(function(error) {
                 error = "writeMode error: " + error;
                 log(error);
                 reject(error);
@@ -174,11 +174,11 @@
             imageType = imageType || ImageType.Application;
 
             connect(device)
-            .then(chars => {
+            .then(function(chars) {
                 versionChar = chars.versionChar;
                 if (versionChar) { // Older DFU implementations (from older Nordic SDKs < 7.0) have no DFU Version characteristic.
                     return versionChar.readValue()
-                    .then(data => {
+                    .then(function(data) {
                         console.log('read versionChar');
                         var view = new DataView(data);
                         var major = view.getUint8(0);
@@ -190,10 +190,10 @@
                     return transfer(chars, arrayBuffer, imageType, 6, 0);
                 }
             })
-            .then(() => {
+            .then(function() {
                 resolve();
             })
-            .catch(error => {
+            .catch(function(error) {
                 log(error);
                 reject(error);
             });
@@ -218,38 +218,38 @@
             }
 
             device.connectGATT()
-            .then(gattServer => {
+            .then(function(gattServer) {
                 // Connected
                 server = gattServer;
                 log("connected to device");
                 return server.getPrimaryService(serviceUUID);
             })
-            .then(primaryService => {
+            .then(function(primaryService) {
                 log("found DFU service");
                 service = primaryService;
                 return service.getCharacteristic(controlUUID);
             })
-            .then(characteristic => {
+            .then(function(characteristic) {
                 log("found control characteristic");
                 controlChar = characteristic;
                 return service.getCharacteristic(packetUUID);
             })
-            .then(characteristic => {
+            .then(function(characteristic) {
                 log("found packet characteristic");
                 packetChar = characteristic;
                 service.getCharacteristic(versionUUID)
                 // Older DFU implementations (from older Nordic SDKs) have no DFU Version characteristic. So this may fail.
-                .then(characteristic => {
+                .then(function(characteristic) {
                     log("found version characteristic");
                     versionChar = characteristic;
                     complete();
                 })
-                .catch(error => {
+                .catch(function(error) {
                     log("info: no version characteristic found");
                     complete();
                 });
             })
-            .catch(error => {
+            .catch(function(error) {
                 error = "connect error: " + error;
                 log(error);
                 reject(error);
@@ -277,12 +277,12 @@
 
             log("enabling notifications");
             controlChar.startNotifications()
-            .then(() => {
+            .then(function() {
                 controlChar.addEventListener('characteristicvaluechanged', handleControl);
                 log("sending imagetype: " + imageType);
                 return controlChar.writeValue(new Uint8Array([OPCODE.START_DFU, imageType]));
             })
-            .then(() => {
+            .then(function() {
                 log("sent start");
 
                 var softLength = (imageType === ImageType.SoftDevice) ? arrayBuffer.byteLength : 0;
@@ -297,10 +297,10 @@
 
                 return packetChar.writeValue(view);
             })
-            .then(() => {
+            .then(function() {
                 log("sent image size: " + arrayBuffer.byteLength);
             })
-            .catch(error => {
+            .catch(function(error) {
                 error = "start error: " + error;
                 log(error);
                 reject(error);
@@ -327,13 +327,13 @@
                             if(req_opcode === OPCODE.START_DFU && majorVersion > 6) { // init packet is not used in SDK v6 (so not used in mbed).
                                 log('write init packet');
                                 controlChar.writeValue(new Uint8Array([OPCODE.INITIALIZE_DFU_PARAMETERS, 0]))
-                                .then(() => {
+                                .then(function() {
                                     return packetChar.writeValue(generateInitPacket());
                                 })
-                                .then(() => {
+                                .then(function() {
                                     return controlChar.writeValue(new Uint8Array([OPCODE.INITIALIZE_DFU_PARAMETERS, 1]));
                                 })
-                                .catch(error => {
+                                .catch(function(error) {
                                     error = "error writing dfu init parameters: " + error;
                                     log(error);
                                     reject(error);
@@ -349,15 +349,15 @@
                             view.setUint16(1, interval, LITTLE_ENDIAN);
     
                             controlChar.writeValue(view)
-                            .then(() => {
+                            .then(function() {
                                 log("sent packet count: " + interval);
                                 return controlChar.writeValue(new Uint8Array([OPCODE.RECEIVE_FIRMWARE_IMAGE]));
                             })
-                            .then(() => {
+                            .then(function() {
                                 log("sent receive");
                                 return writePacket(packetChar, arrayBuffer, 0);
                             })
-                            .catch(error => {
+                            .catch(function(error) {
                                 error = "error sending packet count: " + error;
                                 log(error);
                                 reject(error);
@@ -367,7 +367,7 @@
                             log('check length');
 
                             controlChar.writeValue(new Uint8Array([OPCODE.REPORT_RECEIVED_IMAGE_SIZE]))
-                            .catch(error => {
+                            .catch(function(error) {
                                 error = "error checking length: " + error;
                                 log(error);
                                 reject(error);
@@ -379,7 +379,7 @@
                             log('validate...');
     
                             controlChar.writeValue(new Uint8Array([OPCODE.VALIDATE_FIRMWARE]))
-                            .catch(error => {
+                            .catch(function(error) {
                                 error = "error validating: " + error;
                                 log(error);
                                 reject(error);
@@ -389,20 +389,20 @@
                             log('complete, reset...');
 /*
                             // TODO: Resolve in disconnect event handler when implemented in Web Bluetooth API.
-                            controlChar.service.device.addEventListener("gattserverdisconnected", () => {
+                            controlChar.service.device.addEventListener("gattserverdisconnected", function() {
                                 resolve();
                             });
 */
                             controlChar.writeValue(new Uint8Array([OPCODE.ACTIVATE_IMAGE_AND_RESET]))
-                            .then(() => {
+                            .then(function() {
                                 log('image activated and dfu target reset');
                                 // Hack to gracefully disconnect without disconnect event
-                                setTimeout(() => {
+                                setTimeout(function() {
                                     chars.server.disconnect();
                                     resolve();
                                 }, 2000);
                             })
-                            .catch(error => {
+                            .catch(function(error) {
                                 error = "error resetting: " + error;
                                 log(error);
                                 reject(error);
@@ -428,14 +428,14 @@
         var view = new Uint8Array(packet);
 
         packetChar.writeValue(view)
-        .then(() => {
+        .then(function() {
             count ++;
             offset += packetSize;
             if (count < interval && offset < arrayBuffer.byteLength) {
                 writePacket(packetChar, arrayBuffer, count);
             }
         })
-        .catch(error => {
+        .catch(function(error) {
             error = "writePacket error: " + error;
             log(error);
         });
