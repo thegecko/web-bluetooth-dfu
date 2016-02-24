@@ -1,0 +1,11 @@
+machine:
+  node:
+    version: 4.0.0
+
+dependencies:
+  post:
+    - npm install
+
+test:
+  override:    
+    - gulp
