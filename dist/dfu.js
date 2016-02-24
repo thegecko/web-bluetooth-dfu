@@ -1,10 +1,10 @@
 /* @license
  *
  * Device firmware update with Web Bluetooth
- * Version: 0.0.1
+ * Version: 0.0.2
  *
  * Protocol from:
- * http://developer.nordicsemi.com/nRF51_SDK/nRF51_SDK_v8.x.x/doc/8.1.0/s110/html/a00103.html
+ * http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk52.v0.9.2/bledfu_transport.html?cp=4_0_2_4_2_4
  *
  * The MIT License (MIT)
  *
@@ -114,27 +114,32 @@
      */
     function writeMode(device) {
         return new Promise(function(resolve, reject) {
-            var controlChar = null;
 /*
-            // Disconnect event currently not implemented...
+            // TODO: once disconnect event is implemented we should resolve in its callback...
             device.addEventListener("gattserverdisconnected", () => {
                 log("DFU Target issued GAP Disconnect and reset into Bootloader/DFU mode.");
                 resolve(device);                
             });
 */
+            var characteristics = null;
+
             connect(device)
             .then(chars => {
                 log("enabling notifications");
-                controlChar = chars.controlChar;
-                return controlChar.startNotifications();
+                characteristics = chars;
+                return characteristics.controlChar.startNotifications();
             })
             .then(() => {
                 log("writing modeData");
-                return controlChar.writeValue(new Uint8Array([1, 4]));
+                return characteristics.controlChar.writeValue(new Uint8Array([1, 4]));
             })
             .then(() => {
                 log("modeData written");
-                resolve(device); // TODO: once disconnect event is implemented we should resolve in its callback...
+                // Hack to gracefully disconnect without disconnect event
+                setTimeout(() => {
+                    characteristics.server.disconnect();
+                    resolve(device);
+                }, 2000);
             })
             .catch(error => {
                 error = "writeMode error: " + error;
@@ -143,7 +148,7 @@
             });
         });
     }
-    
+
     /**
      * Contains basic functionality for performing safety checks on software updates for nRF5 based devices.
      * Init packet used for pre-checking to ensure the following image is compatible with the device.
@@ -175,8 +180,9 @@
                     return versionChar.readValue()
                     .then(data => {
                         console.log('read versionChar');
-                        var major = data.getUint8(0);
-                        var minor = data.getUint8(1);
+                        var view = new DataView(data);
+                        var major = view.getUint8(0);
+                        var minor = view.getUint8(1);
                         return transfer(chars, arrayBuffer, imageType, major, minor);
                     });
                 } else {
@@ -232,14 +238,14 @@
                 log("found packet characteristic");
                 packetChar = characteristic;
                 service.getCharacteristic(versionUUID)
-                .then(characteristic => { // Older DFU implementations (from older Nordic SDKs) have no DFU Version characteristic. So this may fail.
+                // Older DFU implementations (from older Nordic SDKs) have no DFU Version characteristic. So this may fail.
+                .then(characteristic => {
                     log("found version characteristic");
                     versionChar = characteristic;
                     complete();
                 })
                 .catch(error => {
-                    error += ' no version charactersitic found';
-                    log(error);
+                    log("info: no version characteristic found");
                     complete();
                 });
             })
@@ -382,7 +388,7 @@
                         case OPCODE.VALIDATE_FIRMWARE:
                             log('complete, reset...');
 /*
-                            // Disconnect event currently not implemented
+                            // TODO: Resolve in disconnect event handler when implemented in Web Bluetooth API.
                             controlChar.service.device.addEventListener("gattserverdisconnected", () => {
                                 resolve();
                             });
@@ -390,7 +396,11 @@
                             controlChar.writeValue(new Uint8Array([OPCODE.ACTIVATE_IMAGE_AND_RESET]))
                             .then(() => {
                                 log('image activated and dfu target reset');
-                                resolve(); // TODO: Resolve in disconnect event handler when implemented in Web Bluetooth API.
+                                // Hack to gracefully disconnect without disconnect event
+                                setTimeout(() => {
+                                    chars.server.disconnect();
+                                    resolve();
+                                }, 2000);
                             })
                             .catch(error => {
                                 error = "error resetting: " + error;

@@ -2,20 +2,35 @@
 <html>
 <head>
     <title>web-bluetooth-dfu</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <style>
+        html, body { width: 100%; padding: 0; margin: 0; font-family: sans-serif; }
+        input { font-size: 20px; }
+        button { font-size: 20px; padding: 0 20px; display: block; margin: 20px auto; }
+        .device-type { width: 160px; margin: 20px auto; white-space: nowrap; }
+    </style>
 </head>
 <body>
-    <button onclick="setMode()" style="font-size: 20px;">Set Mode</button>
-    <button onclick="findDFU()" style="font-size: 20px;">Transfer</button>
-    <button onclick="both()" style="font-size: 20px;">Both</button>
+    <div class="device-type">
+        <input type="radio" name="device-type" id="nrf51" checked>
+        <label for="nrf51">nRF51</label>
+        <input type="radio" name="device-type" id="nrf52">
+        <label for="nrf52">nRF52</label>
+    </div>
+
+    <button onclick="setMode()">Set Mode</button>
+    <button onclick="findDFU()">Transfer</button>
+    <button onclick="both()">Both</button>
+
     <div id="results"></div>
 
     <script src="dist/dfu.js"></script>
     <script src="dist/hex2bin.js"></script>
 
     <script>
-        var urlMask = "//thegecko.github.io/web-bluetooth-dfu/firmware/NRF51822_{0}_Rob_OTA.hex";
-        var urlMask52 = "https://raw.githubusercontent.com/mjdietzx/web-bluetooth-dfu/develop/firmware/ble_app_hrs_with_dfu_nrf52.hex";
         var resultsEl = document.getElementById("results");
+        var urlBase = "//thegecko.github.io/web-bluetooth-dfu/firmware/";
 
         function log(message) {
             console.log(message);
@@ -36,8 +51,18 @@
 
         function transfer(device) {
             return new Promise(function(resolve, reject) {
-                var url = urlMask.replace("{0}", device.name === "Hi_Rob" ? "Bye" : "Hi");
-                //var url = urlMask52; // nRF52832 application (example BLE heart rate from Nordic SDK) for DFU OTA update.
+                var url = "";
+                var deviceType = document.querySelector('input[name="device-type"]:checked').id;
+
+                switch(deviceType) {
+                    case "nrf51":
+                        url = urlBase + "nrf51_app_{0}.hex";
+                        url = url.replace("{0}", device.name === "Hi_Rob" ? "bye" : "hi");
+                        break;
+                    case "nrf52":
+                        url = urlBase + "nrf52_app.hex";
+                        break;
+                }
 
                 download(url)
                 .then(hex => {
