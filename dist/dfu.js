@@ -114,6 +114,7 @@
      */
     function writeMode(device) {
         return new Promise(function(resolve, reject) {
+            var server = null;
             var controlChar = null;
 /*
             // Disconnect event currently not implemented...
@@ -126,15 +127,20 @@
             .then(chars => {
                 log("enabling notifications");
                 controlChar = chars.controlChar;
+                server = chars.server;
                 return controlChar.startNotifications();
             })
             .then(() => {
                 log("writing modeData");
-                return controlChar.writeValue(new Uint8Array([1, 4]));
-            })
-            .then(() => {
-                log("modeData written");
-                resolve(device); // TODO: once disconnect event is implemented we should resolve in its callback...
+                controlChar.writeValue(new Uint8Array([1, 4])); // NOTE: This write will return a failure for mbed although it succeeds in transfering device to bootloader mode.
+                  setTimeout(() => {
+                      log('disconnecting');
+                      server.disconnect(); // NOTE: The peripheral will have already disconnected as it reset in bootloader/dfu mode!
+                      setTimeout(() => {
+                          log('disconnected');
+                          resolve(device); // TODO: once disconnect event is implemented we should resolve in its callback...
+                      }, 1000);
+                }, 1000); 
             })
             .catch(error => {
                 error = "writeMode error: " + error;
@@ -255,6 +261,7 @@
     var offset;
     function transfer(chars, arrayBuffer, imageType, majorVersion, minorVersion) {
         return new Promise(function(resolve, reject) {
+            var server = chars.server;
             var controlChar = chars.controlChar;
             var packetChar = chars.packetChar;
             log('using dfu version ' + majorVersion + "." + minorVersion);
@@ -390,7 +397,11 @@
                             controlChar.writeValue(new Uint8Array([OPCODE.ACTIVATE_IMAGE_AND_RESET]))
                             .then(() => {
                                 log('image activated and dfu target reset');
-                                resolve(); // TODO: Resolve in disconnect event handler when implemented in Web Bluetooth API.
+                                setTimeout(() => {
+                                    log('disconnecting');
+                                    server.disconnect(); // NOTE: The peripheral will have already disconnected as it reset in application mode!
+                                    resolve(); // TODO: Resolve in disconnect event handler when implemented in Web Bluetooth API.
+                                }, 1000);
                             })
                             .catch(error => {
                                 error = "error resetting: " + error;
