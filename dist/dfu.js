@@ -44,6 +44,8 @@
 }(this, function(Promise, bluetooth) {
     "use strict";
 
+    var LITTLE_ENDIAN = true;
+    
     var packetSize = 20;
     var notifySteps = 40;
 
@@ -59,12 +61,30 @@
         SoftDevice_Bootloader: 3,
         Application: 4
     };
-
-    var littleEndian = (function() {
-        var buffer = new ArrayBuffer(2);
-        new DataView(buffer).setInt16(0, 256, true);
-        return new Int16Array(buffer)[0] === 256;
-    })();
+    
+    // TODO: This should be configurable by the user. For now this will work with any of Nordic's SDK examples.
+    var initPacket = {
+        device_type: 0xFFFF,
+        device_rev: 0xFFFF,
+        app_version: 0xFFFFFFFF,
+        softdevice_len: 0x0001,
+        softdevice: 0xFFFE,
+        crc: 0x0000
+    };
+    
+    var OPCODE = {
+        RESERVED: 0,
+        START_DFU: 1,
+        INITIALIZE_DFU_PARAMETERS: 2,
+        RECEIVE_FIRMWARE_IMAGE: 3,
+        VALIDATE_FIRMWARE: 4,
+        ACTIVATE_IMAGE_AND_RESET: 5,
+        RESET_SYSTEM: 6,
+        REPORT_RECEIVED_IMAGE_SIZE: 7,
+        PACKET_RECEIPT_NOTIFICATION_REQUEST: 8,
+        RESPONSE_CODE: 16,
+        PACKET_RECEIPT_NOTIFICATION: 17
+    };
 
     var loggers = [];
     function addLogger(loggerFn) {
@@ -85,28 +105,42 @@
         });
     }
 
+    /**
+     * Switch to bootloader/DFU mode by writing to the control point of the DFU Service.
+     * The DFU Controller is not responsible for disconnecting from the application (DFU Target) after the write.
+     * The application (DFU Target) will issue a GAP Disconnect and reset into bootloader/DFU mode.
+     * 
+     * https://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v11.0.0/bledfu_appswitching.html?cp=4_0_0_4_1_3_2_2
+     */
     function writeMode(device) {
         return new Promise(function(resolve, reject) {
+            var server = null;
+            var controlChar = null;
 /*
-            // Disconnect event currently not implemented
+            // Disconnect event currently not implemented...
             device.addEventListener("gattserverdisconnected", () => {
-                log("modeData written");
-                resolve();                
+                log("DFU Target issued GAP Disconnect and reset into Bootloader/DFU mode.");
+                resolve(device);                
             });
 */
             connect(device)
             .then(chars => {
-                log("writing modeData...");
-                chars.controlChar.writeValue(new Uint8Array([1]));
-
-                // Hack to gracefully disconnect without disconnect event
-                setTimeout(() => {
-                    chars.server.disconnect();
-                    setTimeout(() => {
-                        log("modeData written");
-                        resolve(device);
-                    }, 3000);
-                }, 3000);
+                log("enabling notifications");
+                controlChar = chars.controlChar;
+                server = chars.server;
+                return controlChar.startNotifications();
+            })
+            .then(() => {
+                log("writing modeData");
+                controlChar.writeValue(new Uint8Array([1, 4])); // NOTE: This write will return a failure for mbed although it succeeds in transfering device to bootloader mode.
+                  setTimeout(() => {
+                      log('disconnecting');
+                      server.disconnect(); // NOTE: The peripheral will have already disconnected as it reset in bootloader/dfu mode!
+                      setTimeout(() => {
+                          log('disconnected');
+                          resolve(device); // TODO: once disconnect event is implemented we should resolve in its callback...
+                      }, 1000);
+                }, 1000); 
             })
             .catch(error => {
                 error = "writeMode error: " + error;
@@ -115,23 +149,44 @@
             });
         });
     }
+    
+    /**
+     * Contains basic functionality for performing safety checks on software updates for nRF5 based devices.
+     * Init packet used for pre-checking to ensure the following image is compatible with the device.
+     * Contains information on device type, revision, and supported SoftDevices along with a CRC or hash of firmware image.
+     * 
+     * Not used in mbed bootloader (init packet was optional in SDK v6.x).
+     */
+    function generateInitPacket() {
+        var buffer = new ArrayBuffer(14);
+        var view = new DataView(buffer);
+        view.setUint16(0, initPacket.device_type, LITTLE_ENDIAN);
+        view.setUint16(2, initPacket.device_rev, LITTLE_ENDIAN);
+        view.setUint32(4, initPacket.app_version, LITTLE_ENDIAN); // Application version for the image software. This field allows for additional checking, for example ensuring that a downgrade is not allowed.
+        view.setUint16(8, initPacket.softdevice_len, LITTLE_ENDIAN); // Number of different SoftDevice revisions compatible with this application.
+        view.setUint16(10, initPacket.softdevice, LITTLE_ENDIAN); // Variable length array of SoftDevices compatible with this application. The length of the array is specified in the length (softdevice_len) field. 0xFFFE indicates any SoftDevice.
+        view.setUint16(12, initPacket.crc, LITTLE_ENDIAN);
+        return view;
+    }
 
     function provision(device, arrayBuffer, imageType) {
         return new Promise(function(resolve, reject) {
+            var versionChar = null;
             imageType = imageType || ImageType.Application;
 
             connect(device)
             .then(chars => {
-                if (chars.versionChar) {
-                    return chars.versionChar.readValue()
+                versionChar = chars.versionChar;
+                if (versionChar) { // Older DFU implementations (from older Nordic SDKs < 7.0) have no DFU Version characteristic.
+                    return versionChar.readValue()
                     .then(data => {
-                        var view = new DataView(data);
-                        var major = view.getUint8(0);
-                        var minor = view.getUint8(1);
+                        console.log('read versionChar');
+                        var major = data.getUint8(0);
+                        var minor = data.getUint8(1);
                         return transfer(chars, arrayBuffer, imageType, major, minor);
                     });
                 } else {
-                    // Default to version 6.0
+                    // Default to version 6.0 (mbed).
                     return transfer(chars, arrayBuffer, imageType, 6, 0);
                 }
             })
@@ -183,12 +238,14 @@
                 log("found packet characteristic");
                 packetChar = characteristic;
                 service.getCharacteristic(versionUUID)
-                .then(characteristic => {
+                .then(characteristic => { // Older DFU implementations (from older Nordic SDKs) have no DFU Version characteristic. So this may fail.
                     log("found version characteristic");
                     versionChar = characteristic;
                     complete();
                 })
                 .catch(error => {
+                    error += ' no version charactersitic found';
+                    log(error);
                     complete();
                 });
             })
@@ -204,6 +261,7 @@
     var offset;
     function transfer(chars, arrayBuffer, imageType, majorVersion, minorVersion) {
         return new Promise(function(resolve, reject) {
+            var server = chars.server;
             var controlChar = chars.controlChar;
             var packetChar = chars.packetChar;
             log('using dfu version ' + majorVersion + "." + minorVersion);
@@ -213,9 +271,9 @@
             offset = 0;
 
             if (!controlChar.properties.notify) {
-                var error = "controlChar missing notify property";
-                log(error);
-                return reject(error);
+                var err = "controlChar missing notify property";
+                log(err);
+                return reject(err);
             }
 
             log("enabling notifications");
@@ -223,7 +281,7 @@
             .then(() => {
                 controlChar.addEventListener('characteristicvaluechanged', handleControl);
                 log("sending imagetype: " + imageType);
-                return controlChar.writeValue(new Uint8Array([1, imageType]));
+                return controlChar.writeValue(new Uint8Array([OPCODE.START_DFU, imageType]));
             })
             .then(() => {
                 log("sent start");
@@ -234,15 +292,14 @@
 
                 var buffer = new ArrayBuffer(12);
                 var view = new DataView(buffer);
-                view.setUint32(0, softLength, littleEndian);
-                view.setUint32(4, bootLength, littleEndian);
-                view.setUint32(8, appLength, littleEndian);
+                view.setUint32(0, softLength, LITTLE_ENDIAN);
+                view.setUint32(4, bootLength, LITTLE_ENDIAN);
+                view.setUint32(8, appLength, LITTLE_ENDIAN);
 
-                // Set firmware length
                 return packetChar.writeValue(view);
             })
             .then(() => {
-                log("sent buffer size: " + arrayBuffer.byteLength);
+                log("sent image size: " + arrayBuffer.byteLength);
             })
             .catch(error => {
                 error = "start error: " + error;
@@ -253,103 +310,112 @@
             function handleControl(event) {
                 var data = event.target.value;
                 var view = new DataView(data);
+                
                 var opCode = view.getUint8(0);
+                var req_opcode = view.getUint8(1);
+                var resp_code = view.getUint8(2);
 
-                if (opCode === 16) { // response
-                    var resp_code = view.getUint8(2);
+                if (opCode === OPCODE.RESPONSE_CODE) {
                     if (resp_code !== 1) {
-                        var error = "error from control: " + resp_code;
-                        log(error);
-                        return reject(error);
+                        var err = "error from control point notification, resp_code: " + resp_code;
+                        log(err);
+                        return reject(err);
                     }
+                    
+                    switch(req_opcode) {
+                        case OPCODE.START_DFU:
+                        case OPCODE.INITIALIZE_DFU_PARAMETERS:
+                            if(req_opcode === OPCODE.START_DFU && majorVersion > 6) { // init packet is not used in SDK v6 (so not used in mbed).
+                                log('write init packet');
+                                controlChar.writeValue(new Uint8Array([OPCODE.INITIALIZE_DFU_PARAMETERS, 0]))
+                                .then(() => {
+                                    return packetChar.writeValue(generateInitPacket());
+                                })
+                                .then(() => {
+                                    return controlChar.writeValue(new Uint8Array([OPCODE.INITIALIZE_DFU_PARAMETERS, 1]));
+                                })
+                                .catch(error => {
+                                    error = "error writing dfu init parameters: " + error;
+                                    log(error);
+                                    reject(error);
+                                });
+                                break;
+                            }
+ 
+                            log('send packet count');
 
-                    var req_opcode = view.getUint8(1);
-                    if (req_opcode === 1 && majorVersion > 6) {
-                        log('write null init packet');
+                            var buffer = new ArrayBuffer(3);
+                            view = new DataView(buffer);
+                            view.setUint8(0, OPCODE.PACKET_RECEIPT_NOTIFICATION_REQUEST);
+                            view.setUint16(1, interval, LITTLE_ENDIAN);
+    
+                            controlChar.writeValue(view)
+                            .then(() => {
+                                log("sent packet count: " + interval);
+                                return controlChar.writeValue(new Uint8Array([OPCODE.RECEIVE_FIRMWARE_IMAGE]));
+                            })
+                            .then(() => {
+                                log("sent receive");
+                                return writePacket(packetChar, arrayBuffer, 0);
+                            })
+                            .catch(error => {
+                                error = "error sending packet count: " + error;
+                                log(error);
+                                reject(error);
+                            });
+                            break;
+                        case OPCODE.RECEIVE_FIRMWARE_IMAGE:
+                            log('check length');
 
-                        controlChar.writeValue(new Uint8Array([2,0]))
-                        .then(() => {
-                            return packetChar.writeValue(new Uint8Array([0]));
-                        })
-                        .then(() => {
-                            return controlChar.writeValue(new Uint8Array([2,1]));
-                        })
-                        .catch(error => {
-                            error = "error writing init: " + error;
-                            log(error);
-                            reject(error);
-                        });
-
-                    } else if (req_opcode === 1 || req_opcode === 2) {
-                        log('complete, send packet count');
-
-                        var buffer = new ArrayBuffer(3);
-                        view = new DataView(buffer);
-                        view.setUint8(0, 8);
-                        view.setUint16(1, interval, littleEndian);
-
-                        controlChar.writeValue(view)
-                        .then(() => {
-                            log("sent packet count: " + interval);
-                            return controlChar.writeValue(new Uint8Array([3]));
-                        })
-                        .then(() => {
-                            log("sent receive");
-                            return writePacket(packetChar, arrayBuffer, 0);
-                        })
-                        .catch(error => {
-                            error = "error sending packet count: " + error;
-                            log(error);
-                            reject(error);
-                        });
-
-                    } else if (req_opcode === 3) {
-                        log('complete, check length');
-
-                        controlChar.writeValue(new Uint8Array([7]))
-                        .catch(error => {
-                            error = "error checking length: " + error;
-                            log(error);
-                            reject(error);
-                        });
-
-                    } else if (req_opcode === 7) {
-                        var byteCount = view.getUint32(3, littleEndian);
-                        log('length: ' + byteCount);
-                        log('complete, validate...');
-
-                        controlChar.writeValue(new Uint8Array([4]))
-                        .catch(error => {
-                            error = "error validating: " + error;
-                            log(error);
-                            reject(error);
-                        });
-
-                    } else if (req_opcode === 4) {
-                        log('complete, reset...');
+                            controlChar.writeValue(new Uint8Array([OPCODE.REPORT_RECEIVED_IMAGE_SIZE]))
+                            .catch(error => {
+                                error = "error checking length: " + error;
+                                log(error);
+                                reject(error);
+                            });
+                            break;
+                        case OPCODE.REPORT_RECEIVED_IMAGE_SIZE:
+                            var bytesReceived = view.getUint32(3, LITTLE_ENDIAN);
+                            log('length: ' + bytesReceived);
+                            log('validate...');
+    
+                            controlChar.writeValue(new Uint8Array([OPCODE.VALIDATE_FIRMWARE]))
+                            .catch(error => {
+                                error = "error validating: " + error;
+                                log(error);
+                                reject(error);
+                            });
+                            break;
+                        case OPCODE.VALIDATE_FIRMWARE:
+                            log('complete, reset...');
 /*
-                        // Disconnect event currently not implemented
-                        controlChar.service.device.addEventListener("gattserverdisconnected", () => {
-                            resolve();
-                        });
-*/
-                        controlChar.writeValue(new Uint8Array([5]))
-                        .then(() => {
-                            // Hack to gracefully disconnect without disconnect event
-                            setTimeout(() => {
-                                chars.server.disconnect();
+                            // Disconnect event currently not implemented
+                            controlChar.service.device.addEventListener("gattserverdisconnected", () => {
                                 resolve();
-                            }, 3000);
-                        })
-                        .catch(error => {
-                            error = "error resetting: " + error;
-                            log(error);
-                            reject(error);
-                        });
+                            });
+*/
+                            controlChar.writeValue(new Uint8Array([OPCODE.ACTIVATE_IMAGE_AND_RESET]))
+                            .then(() => {
+                                log('image activated and dfu target reset');
+                                setTimeout(() => {
+                                    log('disconnecting');
+                                    server.disconnect(); // NOTE: The peripheral will have already disconnected as it reset in application mode!
+                                    resolve(); // TODO: Resolve in disconnect event handler when implemented in Web Bluetooth API.
+                                }, 1000);
+                            })
+                            .catch(error => {
+                                error = "error resetting: " + error;
+                                log(error);
+                                reject(error);
+                            });
+                            break;
+                        default:
+                            log('unexpected req opCode - ERROR');
+                            break;
                     }
 
-                } else if (opCode === 17) {
-                    var bytes = view.getUint32(1, littleEndian);
+                } else if (opCode === OPCODE.PACKET_RECEIPT_NOTIFICATION) {
+                    var bytes = view.getUint32(1, LITTLE_ENDIAN);
                     log('transferred: ' + bytes);
                     writePacket(packetChar, arrayBuffer, 0);
                 }
