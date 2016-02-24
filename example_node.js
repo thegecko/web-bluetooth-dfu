@@ -5,12 +5,30 @@ var fs = require('fs');
 var log = console.log;
 dfu.addLogger(log);
 
-var fileMask = "firmware/NRF51822_{0}_Rob_OTA.hex";
+var fileMask = "";
 var fileName = null;
+
+var deviceType = process.argv[2];
+if (!deviceType) {
+    deviceType = "nrf51";
+    log("no device-type specified, defaulting to " + deviceType);
+}
+
+switch(deviceType) {
+    case "nrf51":
+        fileMask = "firmware/nrf51_app_{0}.hex";
+        break;
+    case "nrf52":
+        fileMask = "firmware/nrf52_app.hex";
+        break;
+    default:
+        log("unknown device-type: " + deviceType);
+        process.exit();
+}
 
 dfu.findDevice({ services: [0x180D] })
 .then(device => {
-    fileName = fileMask.replace("{0}", device.name === "Hi_Rob" ? "Bye" : "Hi");
+    fileName = fileMask.replace("{0}", device.name === "Hi_Rob" ? "bye" : "hi");
 	log("found device: " + device.name);
     log("using file name: " + fileName);
 
