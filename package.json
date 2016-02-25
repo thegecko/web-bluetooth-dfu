@@ -21,7 +21,7 @@
     "web-bluetooth"
   ],
   "dependencies": {
-    "bleat": "git://github.com/thegecko/bleat.git#web-bluetooth"
+    "bleat": "git://github.com/thegecko/bleat.git#spec-updates"
   },
   "devDependencies": {
     "gulp": "^3.9.1",
