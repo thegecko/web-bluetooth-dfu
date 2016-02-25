@@ -114,13 +114,12 @@
      */
     function writeMode(device) {
         return new Promise(function(resolve, reject) {
-/*
-            // TODO: once disconnect event is implemented we should resolve in its callback...
+
             device.addEventListener("gattserverdisconnected", function() {
                 log("DFU Target issued GAP Disconnect and reset into Bootloader/DFU mode.");
                 resolve(device);                
             });
-*/
+
             var characteristics = null;
 
             connect(device)
@@ -135,11 +134,6 @@
             })
             .then(function() {
                 log("modeData written");
-                // Hack to gracefully disconnect without disconnect event
-                setTimeout(function() {
-                    characteristics.server.disconnect();
-                    resolve(device);
-                }, 2000);
             })
             .catch(function(error) {
                 error = "writeMode error: " + error;
@@ -180,9 +174,8 @@
                     return versionChar.readValue()
                     .then(function(data) {
                         console.log('read versionChar');
-                        var view = new DataView(data);
-                        var major = view.getUint8(0);
-                        var minor = view.getUint8(1);
+                        var major = data.getUint8(0);
+                        var minor = data.getUint8(1);
                         return transfer(chars, arrayBuffer, imageType, major, minor);
                     });
                 } else {
@@ -217,7 +210,7 @@
                 });
             }
 
-            device.connectGATT()
+            device.gatt.connect()
             .then(function(gattServer) {
                 // Connected
                 server = gattServer;
@@ -307,8 +300,7 @@
             });
 
             function handleControl(event) {
-                var data = event.target.value;
-                var view = new DataView(data);
+                var view = event.target.value;
                 
                 var opCode = view.getUint8(0);
                 var req_opcode = view.getUint8(1);
@@ -387,20 +379,14 @@
                             break;
                         case OPCODE.VALIDATE_FIRMWARE:
                             log('complete, reset...');
-/*
-                            // TODO: Resolve in disconnect event handler when implemented in Web Bluetooth API.
+
                             controlChar.service.device.addEventListener("gattserverdisconnected", function() {
                                 resolve();
                             });
-*/
+
                             controlChar.writeValue(new Uint8Array([OPCODE.ACTIVATE_IMAGE_AND_RESET]))
                             .then(function() {
                                 log('image activated and dfu target reset');
-                                // Hack to gracefully disconnect without disconnect event
-                                setTimeout(function() {
-                                    chars.server.disconnect();
-                                    resolve();
-                                }, 2000);
                             })
                             .catch(function(error) {
                                 error = "error resetting: " + error;
