@@ -45,6 +45,7 @@
     /**
      * Copied from Nordic's command line tool nrf.exe.
      * https://github.com/NordicSemiconductor/pc-nrfutil/blob/master/nordicsemi/dfu/crc16.py
+     * CRC-CCITT (0xFFFF).
      */
     return function (binaryData) {
         var crc = 0xFFFF;

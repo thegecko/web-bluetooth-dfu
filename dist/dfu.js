@@ -166,7 +166,7 @@
         return new Promise(function(resolve, reject) {
             var versionChar = null;
             imageType = imageType || ImageType.Application;
-            initPacket.crc = crc;
+            initPacket.crc = crc || 0xFFFF; // Not used in mbed/ older bootloader revisions.
 
             connect(device)
             .then(function(chars) {
