@@ -27,6 +27,7 @@
 
     <script src="dist/dfu.js"></script>
     <script src="dist/hex2bin.js"></script>
+    <script src="dist/crc16.js"></script>
 
     <script>
         var resultsEl = document.getElementById("results");
@@ -68,8 +69,9 @@
                 .then(hex => {
                     var buffer = hex2bin(hex);
                     log("downloaded length: " + buffer.byteLength);
+                    var crc = crc16(buffer);
 
-                    return dfu.provision(device, buffer);
+                    return dfu.provision(device, buffer, 4, crc);
                 })
                 .then(() => {
                     log('dfu complete');

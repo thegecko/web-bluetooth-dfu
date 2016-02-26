@@ -162,10 +162,11 @@
         return view;
     }
 
-    function provision(device, arrayBuffer, imageType) {
+    function provision(device, arrayBuffer, imageType, crc) {
         return new Promise(function(resolve, reject) {
             var versionChar = null;
             imageType = imageType || ImageType.Application;
+            initPacket.crc = crc;
 
             connect(device)
             .then(function(chars) {
