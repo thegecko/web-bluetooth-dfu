@@ -71,7 +71,7 @@
                     log("downloaded length: " + buffer.byteLength);
                     var crc = crc16(buffer);
 
-                    return dfu.provision(device, buffer, 4, crc);
+                    return dfu.provision(device, buffer, crc); // dfu.ImageType.Application is the default value for the fourth parameter. Specify this if you want to upload a softdevice/bootloader.
                 })
                 .then(() => {
                     log('dfu complete');

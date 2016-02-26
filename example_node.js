@@ -43,7 +43,7 @@ dfu.findDevice({ services: [0x180D] })
     log("file length: " + buffer.byteLength);
     var crc = crc16(buffer);
 
-    return dfu.provision(device, buffer, 4, crc);
+    return dfu.provision(device, buffer, crc);
 })
 .then(() => process.exit())
 .catch(error => {

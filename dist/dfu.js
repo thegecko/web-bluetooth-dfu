@@ -162,11 +162,11 @@
         return view;
     }
 
-    function provision(device, arrayBuffer, imageType, crc) {
+    function provision(device, arrayBuffer, crc, imageType) {
         return new Promise(function(resolve, reject) {
             var versionChar = null;
-            imageType = imageType || ImageType.Application;
             initPacket.crc = crc || 0xFFFF; // Not used in mbed/ older bootloader revisions.
+            imageType = imageType || ImageType.Application;
 
             connect(device)
             .then(function(chars) {
