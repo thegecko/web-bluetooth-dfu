@@ -36,7 +36,7 @@
         define(['es6-promise', 'bleat'], factory);
     } else if (typeof exports === 'object') {
         // Node. Does not work with strict CommonJS
-        module.exports = factory(Promise, require('bleat'));
+        module.exports = factory(Promise, require('bleat').webbluetooth);
     } else {
         // Browser globals with support for web workers (root is window)
         root.dfu = factory(Promise, root.navigator.bluetooth);
