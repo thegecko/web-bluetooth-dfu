@@ -1,6 +1,5 @@
 var dfu = require('./index').dfu;
 var hex2bin = require('./index').hex2bin;
-var crc16 = require('./index').crc16;
 var fs = require('fs');
 
 var log = console.log;
@@ -41,9 +40,8 @@ dfu.findDevice({ services: [0x180D] })
     var hex = file.toString();
     var buffer = hex2bin(hex);
     log("file length: " + buffer.byteLength);
-    var crc = crc16(buffer);
 
-    return dfu.provision(device, buffer, crc);
+    return dfu.provision(device, buffer);
 })
 .then(() => process.exit())
 .catch(error => {

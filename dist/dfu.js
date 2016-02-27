@@ -33,15 +33,15 @@
 (function (root, factory) {
     if (typeof define === 'function' && define.amd) {
         // AMD. Register as an anonymous module.
-        define(['es6-promise', 'bleat'], factory);
+        define(['es6-promise', 'bleat', 'crc16'], factory);
     } else if (typeof exports === 'object') {
         // Node. Does not work with strict CommonJS
-        module.exports = factory(Promise, require('bleat').webbluetooth);
+        module.exports = factory(Promise, require('bleat').webbluetooth, require('./crc16'));
     } else {
         // Browser globals with support for web workers (root is window)
-        root.dfu = factory(Promise, root.navigator.bluetooth);
+        root.dfu = factory(Promise, root.navigator.bluetooth, root.crc16);
     }
-}(this, function(Promise, bluetooth) {
+}(this, function(Promise, bluetooth, crc16) {
     "use strict";
 
     var LITTLE_ENDIAN = true;
@@ -162,16 +162,17 @@
         return view;
     }
 
-    function provision(device, arrayBuffer, crc, imageType) {
+    function provision(device, arrayBuffer, imageType, crc) {
         return new Promise(function(resolve, reject) {
-            var versionChar = null;
-            initPacket.crc = crc || 0xFFFF; // Not used in mbed/ older bootloader revisions.
             imageType = imageType || ImageType.Application;
+            initPacket.crc = crc || crc16(arrayBuffer);
+            var versionChar = null;
 
             connect(device)
             .then(function(chars) {
                 versionChar = chars.versionChar;
-                if (versionChar) { // Older DFU implementations (from older Nordic SDKs < 7.0) have no DFU Version characteristic.
+                // Older DFU implementations (from older Nordic SDKs < 7.0) have no DFU Version characteristic.
+                if (versionChar) {
                     return versionChar.readValue()
                     .then(function(data) {
                         console.log('read versionChar');
