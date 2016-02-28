@@ -30,8 +30,8 @@ Open this site in a [Web Bluetooth](https://webbluetoothcg.github.io/web-bluetoo
 Clone this repository, install the npm dependencies and execute.
 
 ```
-npm install
-node example_node <device-type>
+$ npm install
+$ node example_node <device-type>
 ```
 
 Where ```<device-type>``` is one of ```nrf51``` or ```nrf52```.
