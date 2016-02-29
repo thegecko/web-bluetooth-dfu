@@ -27,7 +27,6 @@
 
  // https://github.com/umdjs/umd
 (function(global, factory) {
-
     if (typeof exports === 'object') {
         // CommonJS (Node)
         module.exports = factory();
@@ -38,7 +37,6 @@
         // Browser global (with support for web workers)
         global.crc16 = factory();
     }
-
 }(this, function() {
     'use strict';
 
