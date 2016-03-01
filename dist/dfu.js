@@ -214,13 +214,8 @@
 
             device.gatt.connect()
             .then(function(gattServer) {
-                // Connected
-                server = gattServer;
-                if (gattServer.connected === false) {
-                    log('not able to connect to device - ERROR');
-                }
-                log(device.uuids);
                 log("connected to device");
+                server = gattServer;
                 return server.getPrimaryService(serviceUUID);
             })
             .then(function(primaryService) {
