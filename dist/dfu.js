@@ -116,8 +116,8 @@
         return new Promise(function(resolve, reject) {
 
             device.addEventListener("gattserverdisconnected", function() {
-                log("DFU Target issued GAP Disconnect and reset into Bootloader/DFU mode.");
-                resolve(device);                
+                log("DFU target issued GAP disconnect and reset into bootloader/DFU mode");
+                resolve(device);       
             });
 
             var characteristics = null;
@@ -130,7 +130,7 @@
             })
             .then(function() {
                 log("writing modeData");
-                return characteristics.controlChar.writeValue(new Uint8Array([1, 4]));
+                return characteristics.controlChar.writeValue(new Uint8Array([OPCODE.START_DFU, ImageType.Application]));
             })
             .then(function() {
                 log("modeData written");
@@ -214,9 +214,8 @@
 
             device.gatt.connect()
             .then(function(gattServer) {
-                // Connected
-                server = gattServer;
                 log("connected to device");
+                server = gattServer;
                 return server.getPrimaryService(serviceUUID);
             })
             .then(function(primaryService) {
@@ -256,6 +255,7 @@
     var offset;
     function transfer(chars, arrayBuffer, imageType, majorVersion, minorVersion) {
         return new Promise(function(resolve, reject) {
+            var server = chars.server;
             var controlChar = chars.controlChar;
             var packetChar = chars.packetChar;
             log('using dfu version ' + majorVersion + "." + minorVersion);
@@ -382,7 +382,8 @@
                         case OPCODE.VALIDATE_FIRMWARE:
                             log('complete, reset...');
 
-                            controlChar.service.device.addEventListener("gattserverdisconnected", function() {
+                            server.device.addEventListener("gattserverdisconnected", function() {
+                                log('disconnected and completed the DFU transfer');
                                 resolve();
                             });
 
