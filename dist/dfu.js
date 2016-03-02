@@ -383,6 +383,7 @@
                             log('complete, reset...');
 
                             server.device.addEventListener("gattserverdisconnected", function() {
+                                log('disconnected and completed the DFU transfer');
                                 resolve();
                             });
 
