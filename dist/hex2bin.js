@@ -130,6 +130,9 @@
         var startAddress = helperGetBinaryStartAddress(hex);
         var endAddress = helperGetBinaryEndAddress(hex);
         
+        minAddress = minAddress || startAddress;
+        maxAddress = maxAddress || endAddress;
+        
         if (startAddress < minAddress) {
             startAddress = minAddress;
         }
@@ -155,7 +158,7 @@
                     var data = line.substr(9, length * 2);
                     for (var i = 0; i < length * 2; i += 2) {
                         var index = (baseAddress + addressOffset) - startAddress + (i / 2);
-                        if (index > 0 || index <= binarySizeBytes) {
+                        if (index > 0 || index <= binarySizeBytes) { // This cuts off any data below minAddress and above maxAddress.
                             view[index] = parseInt(data.substr(i, 2), 16);
                         }
                     }
@@ -166,7 +169,7 @@
                 case RECORD_TYPE.EXTENDED_SEGMENT_ADDRESS:
                     throw 'ERROR - invalid hex file - extended segment address is not handled';
                 case RECORD_TYPE.START_SEGMENT_ADDRESS:
-                    throw 'ERROR - invalid hex file - start segment address is for 80x86 processors';
+                    throw 'ERROR - invalid hex file - start segment address is not handled';
                 case RECORD_TYPE.EXTENDED_LINEAR_ADDRESS:
                     baseAddress = parseInt(line.substr(9, 4), 16) << 16;
                     break;
