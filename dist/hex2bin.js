@@ -39,32 +39,136 @@
     }
 }(this, function() {
     'use strict';
-
-    return function(hex) {
+    
+    var RECORD_TYPE = { // I32HEX files use only record types 00, 01, 04, 05.
+        DATA : '00',
+        END_OF_FILE : '01',
+        EXTENDED_SEGMENT_ADDRESS : '02',
+        START_SEGMENT_ADDRESS : '03',
+        EXTENDED_LINEAR_ADDRESS : '04',
+        START_LINEAR_ADDRESS: '05'
+    };
+    
+    /**
+     * Returns the size, in bytes, of the provided hex file.
+     * NOTE: the binary we generate may be bigger than this size because of padding.
+     * Really this is just a sanity check for now. If the binary is much bigger than the hex then we probably have some kind of an error.
+     */
+    function helperGetHexSize(hex) {
         var hexLines = hex.split("\n");
         var size = 0;
-
         hexLines.forEach(function(line) {
-            if (line.substr(7, 2) === "00") { // type == data
+            if (line.substr(7, 2) === RECORD_TYPE.DATA) {
                 size += parseInt(line.substr(1, 2), 16);
             }
         });
+        log('hex size: ' + size);
+        return size;
+    }
+    
+    /**
+     * The first record of type extended linear address will store the start base address of the binary.
+     * Then the first data record's address offset will complete our start address.
+     */
+    function helperGetBinaryStartAddress(hex) {
+        var hexLines = hex.split("\n");
+        var record;
+        
+        do {
+            record = hexLines.shift();
+        } while (record.substr(7, 2) != RECORD_TYPE.EXTENDED_LINEAR_ADDRESS);
+        
+        var firstBaseAddress = parseInt(record.substr(9, 4), 16) << 16;
+        
+        do {
+            record = hexLines.shift();
+        } while (record.substr(7, 2) != RECORD_TYPE.DATA);
+        var firstDataRecordAddressOffset = parseInt(record.substr(3, 4), 16);
 
-        var buffer = new ArrayBuffer(size);
+        var startAddress = firstBaseAddress + firstDataRecordAddressOffset;
+        log('start address of binary: ' + startAddress);
+        return startAddress;
+    }
+    
+    /**
+     * The last record of type data will store the address offset and length of the data stored at that address.
+     * Then the last extended linear address record's base address will complete our end address.
+     */
+    function helperGetBinaryEndAddress(hex) {
+        var hexLines = hex.split("\n");
+        var record;
+        
+        do {
+            record = hexLines.pop();
+        } while (record.substr(7, 2) != RECORD_TYPE.DATA);
+        
+        var lastDataRecordLength = parseInt(record.substr(1, 2), 16);
+        var lastDataRecordAddressOffset = parseInt(record.substr(3, 4), 16);
+        
+        do {
+            record = hexLines.pop();
+        } while (record.substr(7, 2) != RECORD_TYPE.EXTENDED_LINEAR_ADDRESS);
+        
+        var lastBaseAddress = parseInt(record.substr(9, 4), 16) << 16;
+        
+        var endAddress = lastBaseAddress + lastDataRecordAddressOffset + lastDataRecordLength;
+        log('end address of binary: ' + endAddress);
+        return endAddress;
+    }
+    
+    return function(hex) {
+        var hexLines = hex.split("\n");
+        
+        var hexSizeBytes = helperGetHexSize(hex);
+        var startAddress = helperGetBinaryStartAddress(hex);
+        var endAddress = helperGetBinaryEndAddress(hex);
+        var binarySizeBytes = endAddress - startAddress;
+
+        var buffer = new ArrayBuffer(binarySizeBytes);
         var view = new Uint8Array(buffer);
-        var pointer = 0;
+        view.fill(0xFF); // Pad the binary blob with 0xFF as this corresponds to erased 'unwritten' flash.
+        
+        var baseAddress;
 
         hexLines.forEach(function(line) {
-            if (line.substr(7, 2) === "00") { // type == data
-                var length = parseInt(line.substr(1, 2), 16);
-                var data = line.substr(9, length * 2);
-                for (var i = 0; i < length * 2; i += 2) {
-                    view[pointer] = parseInt(data.substr(i, 2), 16);
-                    pointer++;
-                }
+            
+            switch (line.substr(7, 2)) {
+              
+                case RECORD_TYPE.DATA:
+                    var length = parseInt(line.substr(1, 2), 16);
+                    var addressOffset = parseInt(line.substr(3, 4), 16);
+                    var data = line.substr(9, length * 2);
+                    for (var i = 0; i < length * 2; i += 2) {
+                        var index = (baseAddress + addressOffset) - startAddress + (i / 2);
+                        if (index < 0 || index >= binarySizeBytes) {
+                            throw 'ERROR - invalid index in binary';
+                        }
+                        view[index] = parseInt(data.substr(i, 2), 16);
+                    }
+                    break;
+                case RECORD_TYPE.END_OF_FILE:
+                    log('done converting hex file to binary');
+                    break;
+                case RECORD_TYPE.EXTENDED_SEGMENT_ADDRESS:
+                    throw 'ERROR - invalid hex file - extended segment address is not handled';
+                case RECORD_TYPE.START_SEGMENT_ADDRESS:
+                    throw 'ERROR - invalid hex file - start segment address is for 80x86 processors';
+                case RECORD_TYPE.EXTENDED_LINEAR_ADDRESS:
+                    baseAddress = parseInt(line.substr(9, 4), 16) << 16;
+                    break;
+                case RECORD_TYPE.START_LINEAR_ADDRESS:
+                    log('ignore records of type start linear address');
+                    break;
+                default:
+                    if (line === '') {
+                        break;
+                    } else {
+                        throw 'ERROR - invalid hex file - unexpected record type in provided hex file';
+                    }
+                    
             }
+            
         });
-
         return buffer;
     };
 }));
