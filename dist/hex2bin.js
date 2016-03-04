@@ -116,12 +116,27 @@
         return endAddress;
     }
     
-    return function(hex) {
+    /**
+     * Converts a hex file to a binary blob and returns the data as a buffer.
+     * Any gaps in the hex file are padded with 0xFF in the buffer.
+     * Any data in addresses under minAddress will be cut off along with any data in addresses above maxAddress.
+     * This is because we are not to send the Master Boot Recrod (under minAddress) when updating the SoftDevice.
+     * And we are not to send UICR data (above maxAddress) when updating the bootloader or application.
+     */
+    return function(hex, minAddress, maxAddress) {
         var hexLines = hex.split("\n");
         
         var hexSizeBytes = helperGetHexSize(hex);
         var startAddress = helperGetBinaryStartAddress(hex);
         var endAddress = helperGetBinaryEndAddress(hex);
+        
+        if (startAddress < minAddress) {
+            startAddress = minAddress;
+        }
+        if (endAddress > maxAddress) {
+            endAddress = maxAddress;
+        }
+        
         var binarySizeBytes = endAddress - startAddress;
 
         var buffer = new ArrayBuffer(binarySizeBytes);
@@ -140,10 +155,9 @@
                     var data = line.substr(9, length * 2);
                     for (var i = 0; i < length * 2; i += 2) {
                         var index = (baseAddress + addressOffset) - startAddress + (i / 2);
-                        if (index < 0 || index >= binarySizeBytes) {
-                            throw 'ERROR - invalid index in binary';
+                        if (index > 0 || index <= binarySizeBytes) {
+                            view[index] = parseInt(data.substr(i, 2), 16);
                         }
-                        view[index] = parseInt(data.substr(i, 2), 16);
                     }
                     break;
                 case RECORD_TYPE.END_OF_FILE:
