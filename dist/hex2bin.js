@@ -111,7 +111,7 @@
      * And we are not to send UICR data (above maxAddress) when updating the bootloader or application.
      */
     return function(hex, minAddress, maxAddress) {
-        maxAddress = maxAddress || 0xFFFFFFFF;
+        maxAddress = maxAddress || 0x80000; // This will always cut off the UICR and the user will not have to every specify this parameter.
         minAddress = minAddress || 0x0;
         
         var startAddress = helperGetBinaryStartAddress(hex.split("\n"), minAddress);
