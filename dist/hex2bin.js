@@ -50,23 +50,7 @@
     };
     
     /**
-     * Returns the size, in bytes, of the provided hex file.
-     * NOTE: the binary we generate may be bigger than this size because of padding.
-     * Really this is just a sanity check for now. If the binary is much bigger than the hex then we probably have some kind of an error.
-     */
-    function helperGetHexSize(hexLines) {
-        var size = 0;
-        hexLines.forEach(function(line) {
-            if (line.substr(7, 2) === RECORD_TYPE.DATA) {
-                size += parseInt(line.substr(1, 2), 16);
-            }
-        });
-        log('hex size: ' + size);
-        return size;
-    }
-    
-    /**
-     * The first record of type extended linear address will store the start base address of the binary.
+     * The first record of type extended linear address in the provided hex file will store the start base address of the binary.
      * Then the first data record's address offset will complete our start address.
      */
     function helperGetBinaryStartAddress(hexLines) {
@@ -89,8 +73,8 @@
     }
     
     /**
-     * The last record of type data will store the address offset and length of the data stored at that address.
-     * Then the last extended linear address record's base address will complete our end address.
+     * The last record of type extended linear address in the provided hex file will store the base address of the last data segment in the binary.
+     * Then the last record of type data will store the address offset and length of data to be stored here to complete the base address and obtain maxAddress.
      */
     function helperGetBinaryEndAddress(hexLines, maxAddress) {
         var record;
@@ -109,7 +93,6 @@
         var lastBaseAddress = parseInt(record.substr(9, 4), 16) << 16;
         
         var endAddress = lastBaseAddress + lastDataRecordAddressOffset + lastDataRecordLength;
-        
         if (endAddress > maxAddress) {
             return helperGetBinaryEndAddress(hexLines, maxAddress);
         }
@@ -119,25 +102,23 @@
     
     /**
      * Converts a hex file to a binary blob and returns the data as a buffer.
-     * Any gaps in the hex file are padded with 0xFF in the buffer.
-     * Any data in addresses under minAddress will be cut off along with any data in addresses above maxAddress.
-     * This is because we are not to send the Master Boot Recrod (under minAddress) when updating the SoftDevice.
+     * @param hex - hex file of either SoftDevice, Application or Bootloader to be transferred OTA to the device. Must be a valid Intel 32 hex file.
+     * @param minAddress - the first address (i.e. when updating the SoftDevice we don't send the Master Boot Record).
+     * @param maxAddress - the last address in the devices flash.
+     * @return a buffer of bytes that corresponds to the inputs of this function and is padded with 0xFF in gaps between data segments in the hex file.
+     * Any data in addresses under minAddress will be cut off along with any data in addresses above maxAddress (required by Nordic's DFU protocol).
+     * This is because we are not to send the Master Boot Record (under minAddress) when updating the SoftDevice.
      * And we are not to send UICR data (above maxAddress) when updating the bootloader or application.
      */
-    return function(hex, maxAddress, minAddress) {
+    return function(hex, minAddress, maxAddress) {
         maxAddress = maxAddress || 0xFFFFFFFF;
         minAddress = minAddress || 0x0;
         
-        var hexSizeBytes = helperGetHexSize(hex.split("\n"));
         var startAddress = helperGetBinaryStartAddress(hex.split("\n"), minAddress);
         var endAddress = helperGetBinaryEndAddress(hex.split("\n"), maxAddress);
         
         if (startAddress < minAddress) {
             startAddress = minAddress;
-            log('trimmed start address of binary: ' + startAddress);
-        }
-        if (endAddress > maxAddress) {
-            endAddress = maxAddress;
             log('trimmed start address of binary: ' + startAddress);
         }
         
