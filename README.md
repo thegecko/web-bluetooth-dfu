@@ -38,15 +38,9 @@ Where ```<device-type>``` is one of ```nrf51``` or ```nrf52```.
 
 ## Updating the SoftDevice or Bootloader
 
-When updating the application the only input required is APPLICATION.hex. However it is possible to update the SoftDevice or Bootloader as well. The user will need to specify the image type of the update when transferring 
-a SoftDevice or Bootloader in dfu.provision() (i.e. dfu.provision(device, buffer, dfu.ImageType.SoftDevice);).
-
-Softdevice: The .hex file below can be transferred via DFU to test SoftDevice updates. (The end address of the Master Boot Record (MBR) must be specified in hex2bin (i.e. hex2bin(SOFTDEVICE.hex, 0x1000);) as it must not be rewritten during DFU).
+The .hex files below can be transferred via DFU to test SoftDevice and Bootloader updates respectivley.
 
 [nrf52_softdevice_only.hex](https://thegecko.github.io/web-bluetooth-dfu/firmware/nrf52_softdevice_only.hex). Nordic's s132 SoftDevice (nRF52 only).
-
-Bootloader: The .hex file below can be transferred via DFU to test bootloader updates.
-
 [nrf52_bootloader_only.hex](https://thegecko.github.io/web-bluetooth-dfu/firmware/nrf52_bootloader_only.hex). Nordic's standard bootloader (nRF52 only).
 
 Note: Currently updating the SoftDevice and Bootloader at the same time is not supported.
