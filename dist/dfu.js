@@ -58,7 +58,7 @@
         None: 0,
         SoftDevice: 1,
         Bootloader: 2,
-        SoftDevice_Bootloader: 3,
+        SoftDevice_Bootloader: 3, // Will not work right now
         Application: 4
     };
     
