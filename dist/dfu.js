@@ -46,33 +46,23 @@
 
     var LITTLE_ENDIAN = true;
     
-    var packetSize = 20;
-    var notifySteps = 40;
+    var PACKET_SIZE = 20;
+    var NOTIFY_STEPS = 40;
 
-    var serviceUUID = "00001530-1212-efde-1523-785feabcd123";
-    var controlUUID = "00001531-1212-efde-1523-785feabcd123";
-    var packetUUID = "00001532-1212-efde-1523-785feabcd123";
-    var versionUUID = "00001534-1212-efde-1523-785feabcd123";
+    var SERVICE_UUID = "00001530-1212-efde-1523-785feabcd123";
+    var CONTROL_UUID = "00001531-1212-efde-1523-785feabcd123";
+    var PACKET_UUID = "00001532-1212-efde-1523-785feabcd123";
+    var VERSION_UUID = "00001534-1212-efde-1523-785feabcd123";
 
     var ImageType = {
-        None: 0,
-        SoftDevice: 1,
-        Bootloader: 2,
-        SoftDevice_Bootloader: 3, // Will not work right now
-        Application: 4
+        NONE: 0,
+        SOFTDEVICE: 1,
+        BOOTLOADER: 2,
+        SOFTDEVICE_BOOTLOADER: 3, // Will not work right now.
+        APPLICATION: 4
     };
     
-    // TODO: This should be configurable by the user. For now this will work with any of Nordic's SDK examples.
-    var initPacket = {
-        device_type: 0xFFFF,
-        device_rev: 0xFFFF,
-        app_version: 0xFFFFFFFF,
-        softdevice_len: 0x0001,
-        softdevice: 0xFFFE,
-        crc: 0x0000
-    };
-    
-    var OPCODE = {
+    var Opcode = {
         RESERVED: 0,
         START_DFU: 1,
         INITIALIZE_DFU_PARAMETERS: 2,
@@ -85,7 +75,17 @@
         RESPONSE_CODE: 16,
         PACKET_RECEIPT_NOTIFICATION: 17
     };
-
+    
+    // TODO: This should be configurable by the user. For now this will work with any of Nordic's SDK examples.
+    var InitPacket = {
+        device_type: 0xFFFF,
+        device_rev: 0xFFFF,
+        app_version: 0xFFFFFFFF,
+        softdevice_len: 0x0001,
+        softdevice: 0xFFFE,
+        crc: 0x0000
+    };
+    
     var loggers = [];
     function addLogger(loggerFn) {
         if (typeof loggerFn === "function") {
@@ -101,7 +101,7 @@
     function findDevice(filters) {
         return bluetooth.requestDevice({
             filters: [ filters ],
-            optionalServices: [serviceUUID]
+            optionalServices: [SERVICE_UUID]
         });
     }
 
@@ -130,10 +130,13 @@
             })
             .then(function() {
                 log("writing modeData");
-                return characteristics.controlChar.writeValue(new Uint8Array([OPCODE.START_DFU, ImageType.Application]));
+                return characteristics.controlChar.writeValue(new Uint8Array([Opcode.START_DFU, ImageType.APPLICATION]));
             })
             .then(function() {
                 log("modeData written");
+                setTimeout(function() {
+                    resolve(device);
+                }, 5e3);
             })
             .catch(function(error) {
                 error = "writeMode error: " + error;
@@ -153,19 +156,19 @@
     function generateInitPacket() {
         var buffer = new ArrayBuffer(14);
         var view = new DataView(buffer);
-        view.setUint16(0, initPacket.device_type, LITTLE_ENDIAN);
-        view.setUint16(2, initPacket.device_rev, LITTLE_ENDIAN);
-        view.setUint32(4, initPacket.app_version, LITTLE_ENDIAN); // Application version for the image software. This field allows for additional checking, for example ensuring that a downgrade is not allowed.
-        view.setUint16(8, initPacket.softdevice_len, LITTLE_ENDIAN); // Number of different SoftDevice revisions compatible with this application.
-        view.setUint16(10, initPacket.softdevice, LITTLE_ENDIAN); // Variable length array of SoftDevices compatible with this application. The length of the array is specified in the length (softdevice_len) field. 0xFFFE indicates any SoftDevice.
-        view.setUint16(12, initPacket.crc, LITTLE_ENDIAN);
+        view.setUint16(0, InitPacket.device_type, LITTLE_ENDIAN);
+        view.setUint16(2, InitPacket.device_rev, LITTLE_ENDIAN);
+        view.setUint32(4, InitPacket.app_version, LITTLE_ENDIAN); // Application version for the image software. This field allows for additional checking, for example ensuring that a downgrade is not allowed.
+        view.setUint16(8, InitPacket.softdevice_len, LITTLE_ENDIAN); // Number of different SoftDevice revisions compatible with this application.
+        view.setUint16(10, InitPacket.softdevice, LITTLE_ENDIAN); // Variable length array of SoftDevices compatible with this application. The length of the array is specified in the length (softdevice_len) field. 0xFFFE indicates any SoftDevice.
+        view.setUint16(12, InitPacket.crc, LITTLE_ENDIAN);
         return view;
     }
 
     function provision(device, arrayBuffer, imageType, crc) {
         return new Promise(function(resolve, reject) {
-            imageType = imageType || ImageType.Application;
-            initPacket.crc = crc || crc16(arrayBuffer);
+            imageType = imageType || ImageType.APPLICATION;
+            InitPacket.crc = crc || crc16(arrayBuffer);
             var versionChar = null;
 
             connect(device)
@@ -216,22 +219,22 @@
             .then(function(gattServer) {
                 log("connected to device");
                 server = gattServer;
-                return server.getPrimaryService(serviceUUID);
+                return server.getPrimaryService(SERVICE_UUID);
             })
             .then(function(primaryService) {
                 log("found DFU service");
                 service = primaryService;
-                return service.getCharacteristic(controlUUID);
+                return service.getCharacteristic(CONTROL_UUID);
             })
             .then(function(characteristic) {
                 log("found control characteristic");
                 controlChar = characteristic;
-                return service.getCharacteristic(packetUUID);
+                return service.getCharacteristic(PACKET_UUID);
             })
             .then(function(characteristic) {
                 log("found packet characteristic");
                 packetChar = characteristic;
-                service.getCharacteristic(versionUUID)
+                service.getCharacteristic(VERSION_UUID)
                 // Older DFU implementations (from older Nordic SDKs) have no DFU Version characteristic. So this may fail.
                 .then(function(characteristic) {
                     log("found version characteristic");
@@ -261,7 +264,7 @@
             log('using dfu version ' + majorVersion + "." + minorVersion);
 
             // Set up receipts
-            interval = Math.floor(arrayBuffer.byteLength / (packetSize * notifySteps));
+            interval = Math.floor(arrayBuffer.byteLength / (PACKET_SIZE * NOTIFY_STEPS));
             offset = 0;
 
             if (!controlChar.properties.notify) {
@@ -275,14 +278,14 @@
             .then(function() {
                 controlChar.addEventListener('characteristicvaluechanged', handleControl);
                 log("sending imagetype: " + imageType);
-                return controlChar.writeValue(new Uint8Array([OPCODE.START_DFU, imageType]));
+                return controlChar.writeValue(new Uint8Array([Opcode.START_DFU, imageType]));
             })
             .then(function() {
                 log("sent start");
 
-                var softLength = (imageType === ImageType.SoftDevice) ? arrayBuffer.byteLength : 0;
-                var bootLength = (imageType === ImageType.Bootloader) ? arrayBuffer.byteLength : 0;
-                var appLength = (imageType === ImageType.Application) ? arrayBuffer.byteLength : 0;
+                var softLength = (imageType === ImageType.SOFTDEVICE) ? arrayBuffer.byteLength : 0;
+                var bootLength = (imageType === ImageType.BOOTLOADER) ? arrayBuffer.byteLength : 0;
+                var appLength = (imageType === ImageType.APPLICATION) ? arrayBuffer.byteLength : 0;
 
                 var buffer = new ArrayBuffer(12);
                 var view = new DataView(buffer);
@@ -308,7 +311,7 @@
                 var req_opcode = view.getUint8(1);
                 var resp_code = view.getUint8(2);
 
-                if (opCode === OPCODE.RESPONSE_CODE) {
+                if (opCode === Opcode.RESPONSE_CODE) {
                     if (resp_code !== 1) {
                         var err = "error from control point notification, resp_code: " + resp_code;
                         log(err);
@@ -316,16 +319,16 @@
                     }
                     
                     switch(req_opcode) {
-                        case OPCODE.START_DFU:
-                        case OPCODE.INITIALIZE_DFU_PARAMETERS:
-                            if(req_opcode === OPCODE.START_DFU && majorVersion > 6) { // init packet is not used in SDK v6 (so not used in mbed).
+                        case Opcode.START_DFU:
+                        case Opcode.INITIALIZE_DFU_PARAMETERS:
+                            if(req_opcode === Opcode.START_DFU && majorVersion > 6) { // init packet is not used in SDK v6 (so not used in mbed).
                                 log('write init packet');
-                                controlChar.writeValue(new Uint8Array([OPCODE.INITIALIZE_DFU_PARAMETERS, 0]))
+                                controlChar.writeValue(new Uint8Array([Opcode.INITIALIZE_DFU_PARAMETERS, 0]))
                                 .then(function() {
                                     return packetChar.writeValue(generateInitPacket());
                                 })
                                 .then(function() {
-                                    return controlChar.writeValue(new Uint8Array([OPCODE.INITIALIZE_DFU_PARAMETERS, 1]));
+                                    return controlChar.writeValue(new Uint8Array([Opcode.INITIALIZE_DFU_PARAMETERS, 1]));
                                 })
                                 .catch(function(error) {
                                     error = "error writing dfu init parameters: " + error;
@@ -339,13 +342,13 @@
 
                             var buffer = new ArrayBuffer(3);
                             view = new DataView(buffer);
-                            view.setUint8(0, OPCODE.PACKET_RECEIPT_NOTIFICATION_REQUEST);
+                            view.setUint8(0, Opcode.PACKET_RECEIPT_NOTIFICATION_REQUEST);
                             view.setUint16(1, interval, LITTLE_ENDIAN);
     
                             controlChar.writeValue(view)
                             .then(function() {
                                 log("sent packet count: " + interval);
-                                return controlChar.writeValue(new Uint8Array([OPCODE.RECEIVE_FIRMWARE_IMAGE]));
+                                return controlChar.writeValue(new Uint8Array([Opcode.RECEIVE_FIRMWARE_IMAGE]));
                             })
                             .then(function() {
                                 log("sent receive");
@@ -357,29 +360,29 @@
                                 reject(error);
                             });
                             break;
-                        case OPCODE.RECEIVE_FIRMWARE_IMAGE:
+                        case Opcode.RECEIVE_FIRMWARE_IMAGE:
                             log('check length');
 
-                            controlChar.writeValue(new Uint8Array([OPCODE.REPORT_RECEIVED_IMAGE_SIZE]))
+                            controlChar.writeValue(new Uint8Array([Opcode.REPORT_RECEIVED_IMAGE_SIZE]))
                             .catch(function(error) {
                                 error = "error checking length: " + error;
                                 log(error);
                                 reject(error);
                             });
                             break;
-                        case OPCODE.REPORT_RECEIVED_IMAGE_SIZE:
+                        case Opcode.REPORT_RECEIVED_IMAGE_SIZE:
                             var bytesReceived = view.getUint32(3, LITTLE_ENDIAN);
                             log('length: ' + bytesReceived);
                             log('validate...');
     
-                            controlChar.writeValue(new Uint8Array([OPCODE.VALIDATE_FIRMWARE]))
+                            controlChar.writeValue(new Uint8Array([Opcode.VALIDATE_FIRMWARE]))
                             .catch(function(error) {
                                 error = "error validating: " + error;
                                 log(error);
                                 reject(error);
                             });
                             break;
-                        case OPCODE.VALIDATE_FIRMWARE:
+                        case Opcode.VALIDATE_FIRMWARE:
                             log('complete, reset...');
 
                             server.device.addEventListener("gattserverdisconnected", function() {
@@ -387,7 +390,7 @@
                                 resolve();
                             });
 
-                            controlChar.writeValue(new Uint8Array([OPCODE.ACTIVATE_IMAGE_AND_RESET]))
+                            controlChar.writeValue(new Uint8Array([Opcode.ACTIVATE_IMAGE_AND_RESET]))
                             .then(function() {
                                 log('image activated and dfu target reset');
                             })
@@ -402,7 +405,7 @@
                             break;
                     }
 
-                } else if (opCode === OPCODE.PACKET_RECEIPT_NOTIFICATION) {
+                } else if (opCode === Opcode.PACKET_RECEIPT_NOTIFICATION) {
                     var bytes = view.getUint32(1, LITTLE_ENDIAN);
                     log('transferred: ' + bytes);
                     writePacket(packetChar, arrayBuffer, 0);
@@ -412,14 +415,14 @@
     }
 
     function writePacket(packetChar, arrayBuffer, count) {
-        var size = (offset + packetSize > arrayBuffer.byteLength) ? arrayBuffer.byteLength - offset : packetSize;
+        var size = (offset + PACKET_SIZE > arrayBuffer.byteLength) ? arrayBuffer.byteLength - offset : PACKET_SIZE;
         var packet = arrayBuffer.slice(offset, offset + size);
         var view = new Uint8Array(packet);
 
         packetChar.writeValue(view)
         .then(function() {
             count ++;
-            offset += packetSize;
+            offset += PACKET_SIZE;
             if (count < interval && offset < arrayBuffer.byteLength) {
                 writePacket(packetChar, arrayBuffer, count);
             }
