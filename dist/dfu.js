@@ -217,8 +217,15 @@
 
             device.gatt.connect()
             .then(function(gattServer) {
+                return new Promise(function(resolve) {
+                    server = gattServer;
+                    setTimeout(function() {
+                          resolve();
+                  }, 5e3);
+                });
+            })
+            .then(function() {
                 log("connected to device");
-                server = gattServer;
                 return server.getPrimaryService(SERVICE_UUID);
             })
             .then(function(primaryService) {
