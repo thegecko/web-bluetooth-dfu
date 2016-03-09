@@ -135,8 +135,9 @@
             .then(function() {
                 log("modeData written");
                 setTimeout(function() {
-                    resolve(device);
-                }, 2e3);
+                    resolve(device); // TODO: Remove this when gattserverdisconnected is implemented.
+                }, 1e3);
+                
             })
             .catch(function(error) {
                 error = "writeMode error: " + error;
@@ -219,7 +220,7 @@
             .then(function(gattServer) {
                 return new Promise(function(resolve) {
                     server = gattServer;
-                    setTimeout(resolve, 2e3);
+                    setTimeout(resolve, 2e3); // This delay is needed because BlueZ needs time to update it's cache.
                 });
             })
             .then(function() {
