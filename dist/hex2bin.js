@@ -40,7 +40,7 @@
 }(this, function() {
     'use strict';
     
-    var RECORD_TYPE = { // I32HEX files use only record types 00, 01, 04, 05.
+    var RecordType = { // I32HEX files use only record types 00, 01, 04, 05.
         DATA : '00',
         END_OF_FILE : '01',
         EXTENDED_SEGMENT_ADDRESS : '02',
@@ -58,13 +58,13 @@
         
         do {
             record = hexLines.shift();
-        } while (record.substr(7, 2) != RECORD_TYPE.EXTENDED_LINEAR_ADDRESS);
+        } while (record.substr(7, 2) != RecordType.EXTENDED_LINEAR_ADDRESS);
         
         var firstBaseAddress = parseInt(record.substr(9, 4), 16) << 16;
         
         do {
             record = hexLines.shift();
-        } while (record.substr(7, 2) != RECORD_TYPE.DATA);
+        } while (record.substr(7, 2) != RecordType.DATA);
         var firstDataRecordAddressOffset = parseInt(record.substr(3, 4), 16);
 
         var startAddress = firstBaseAddress + firstDataRecordAddressOffset;
@@ -81,14 +81,14 @@
         
         do {
             record = hexLines.pop();
-        } while (record.substr(7, 2) != RECORD_TYPE.DATA);
+        } while (record.substr(7, 2) != RecordType.DATA);
         
         var lastDataRecordLength = parseInt(record.substr(1, 2), 16);
         var lastDataRecordAddressOffset = parseInt(record.substr(3, 4), 16);
         
         do {
             record = hexLines.pop();
-        } while (record.substr(7, 2) != RECORD_TYPE.EXTENDED_LINEAR_ADDRESS);
+        } while (record.substr(7, 2) != RecordType.EXTENDED_LINEAR_ADDRESS);
         
         var lastBaseAddress = parseInt(record.substr(9, 4), 16) << 16;
         
@@ -135,7 +135,7 @@
             
             switch (line.substr(7, 2)) {
               
-                case RECORD_TYPE.DATA:
+                case RecordType.DATA:
                     var length = parseInt(line.substr(1, 2), 16);
                     var addressOffset = parseInt(line.substr(3, 4), 16);
                     var data = line.substr(9, length * 2);
@@ -146,17 +146,17 @@
                         }
                     }
                     break;
-                case RECORD_TYPE.END_OF_FILE:
+                case RecordType.END_OF_FILE:
                     log('done converting hex file to binary');
                     break;
-                case RECORD_TYPE.EXTENDED_SEGMENT_ADDRESS:
+                case RecordType.EXTENDED_SEGMENT_ADDRESS:
                     throw 'ERROR - invalid hex file - extended segment address is not handled';
-                case RECORD_TYPE.START_SEGMENT_ADDRESS:
+                case RecordType.START_SEGMENT_ADDRESS:
                     throw 'ERROR - invalid hex file - start segment address is not handled';
-                case RECORD_TYPE.EXTENDED_LINEAR_ADDRESS:
+                case RecordType.EXTENDED_LINEAR_ADDRESS:
                     baseAddress = parseInt(line.substr(9, 4), 16) << 16;
                     break;
-                case RECORD_TYPE.START_LINEAR_ADDRESS:
+                case RecordType.START_LINEAR_ADDRESS:
                     log('ignore records of type start linear address');
                     break;
                 default:
