@@ -136,7 +136,7 @@
                 log("modeData written");
                 setTimeout(function() {
                     resolve(device);
-                }, 5e3);
+                }, 2e3);
             })
             .catch(function(error) {
                 error = "writeMode error: " + error;
@@ -219,9 +219,7 @@
             .then(function(gattServer) {
                 return new Promise(function(resolve) {
                     server = gattServer;
-                    setTimeout(function() {
-                          resolve();
-                  }, 5e3);
+                    setTimeout(resolve, 2e3);
                 });
             })
             .then(function() {
