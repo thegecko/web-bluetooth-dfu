@@ -38,6 +38,7 @@
             resultsEl.innerText += message + "\n";
         }
         dfu.addLogger(log);
+        hex2bin.addLogger(log);
 
         function download(url) {
             return new Promise(function(resolve, reject) {
@@ -67,7 +68,7 @@
 
                 download(url)
                 .then(hex => {
-                    var buffer = hex2bin(hex);
+                    var buffer = hex2bin.convert(hex);
                     log("downloaded length: " + buffer.byteLength);
 
                     // dfu.ImageType.Application is the default value for the third parameter

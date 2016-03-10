@@ -4,6 +4,7 @@ var fs = require('fs');
 
 var log = console.log;
 dfu.addLogger(log);
+hex2bin.addLogger(log);
 
 var fileMask = "";
 var fileName = null;
@@ -38,7 +39,7 @@ dfu.findDevice({ services: [0x180D] })
 .then(device => {
     var file = fs.readFileSync(fileName);
     var hex = file.toString();
-    var buffer = hex2bin(hex);
+    var buffer = hex2bin.convert(hex);
     log("file length: " + buffer.byteLength);
 
     return dfu.provision(device, buffer);

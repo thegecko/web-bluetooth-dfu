@@ -48,7 +48,19 @@
         EXTENDED_LINEAR_ADDRESS : '04',
         START_LINEAR_ADDRESS: '05'
     };
-    
+
+    var loggers = [];
+    function addLogger(loggerFn) {
+        if (typeof loggerFn === "function") {
+            loggers.push(loggerFn);
+        }
+    }
+    function log(message) {
+        loggers.forEach(function(logger) {
+            logger(message);
+        });
+    }
+
     /**
      * The first record of type extended linear address in the provided hex file will store the start base address of the binary.
      * Then the first data record's address offset will complete our start address.
@@ -110,7 +122,7 @@
      * This is because we are not to send the Master Boot Record (under minAddress) when updating the SoftDevice.
      * And we are not to send UICR data (above maxAddress) when updating the bootloader or application.
      */
-    return function(hex, minAddress, maxAddress) {
+    function convert(hex, minAddress, maxAddress) {
         maxAddress = maxAddress || 0x80000; // This will always cut off the UICR and the user will not have to every specify this parameter.
         minAddress = minAddress || 0x0;
         
@@ -170,5 +182,10 @@
             
         });
         return buffer;
+    }
+
+    return {
+        addLogger: addLogger,
+        convert: convert
     };
 }));
