@@ -115,10 +115,15 @@
     function writeMode(device) {
         return new Promise(function(resolve, reject) {
 
-            device.addEventListener("gattserverdisconnected", function() {
-                log("DFU target issued GAP disconnect and reset into bootloader/DFU mode");
-                resolve(device);       
-            });
+            var resolved = false;
+            function disconnectHandler() {
+                if (!resolved) {
+                    resolved = true;
+                    log("DFU target issued GAP disconnect and reset into bootloader/DFU mode");
+                    resolve(device);
+                }
+            }
+            device.addEventListener("gattserverdisconnected", disconnectHandler);
 
             var characteristics = null;
 
@@ -134,9 +139,13 @@
             })
             .then(function() {
                 log("modeData written");
-                setTimeout(function() {  // TODO: Remove this when gattserverdisconnected event is implemented and possibly put a timeout in that event handler before resolving.
-                    resolve(device);
-                }, 2000);
+                // TODO: Remove this when gattserverdisconnected event is implemented and possibly put a timeout in that event handler before resolving
+                setTimeout(function() {
+                    if (characteristics.server.connected === true) {
+                        characteristics.server.disconnect();
+                    }
+                    disconnectHandler();
+                }, 5000);
             })
             .catch(function(error) {
                 error = "writeMode error: " + error;
@@ -178,7 +187,7 @@
                 if (versionChar) {
                     return versionChar.readValue()
                     .then(function(data) {
-                        console.log('read versionChar');
+                        log('read versionChar');
                         var major = data.getUint8(0);
                         var minor = data.getUint8(1);
                         return transfer(chars, arrayBuffer, imageType, major, minor);
@@ -218,9 +227,10 @@
             device.gatt.connect()
             .then(function(gattServer) {
                 log("connected to device");
-                return new Promise(function(resolve) {
-                    server = gattServer;
-                    setTimeout(resolve, 2000); // This delay is needed because BlueZ needs time to update it's cache.
+                server = gattServer;
+                // This delay is needed because BlueZ needs time to update it's cache.
+                return new Promise(function(resolve, reject) {
+                    setTimeout(resolve, 2000);
                 });
             })
             .then(function() {
@@ -263,10 +273,21 @@
     var offset;
     function transfer(chars, arrayBuffer, imageType, majorVersion, minorVersion) {
         return new Promise(function(resolve, reject) {
+            // This should be 'chars.controlChar.service.server' but it's not implemented yet
             var server = chars.server;
             var controlChar = chars.controlChar;
             var packetChar = chars.packetChar;
             log('using dfu version ' + majorVersion + "." + minorVersion);
+
+            var resolved = false;
+            function disconnectHandler() {
+                if (!resolved) {
+                    resolved = true;
+                    log('disconnected and completed the DFU transfer');
+                    resolve();
+                }
+            }
+            server.device.addEventListener("gattserverdisconnected", disconnectHandler);
 
             // Set up receipts
             interval = Math.floor(arrayBuffer.byteLength / (packetSize * notifySteps));
@@ -390,14 +411,16 @@
                         case OPCODE.VALIDATE_FIRMWARE:
                             log('complete, reset...');
 
-                            server.device.addEventListener("gattserverdisconnected", function() {
-                                log('disconnected and completed the DFU transfer');
-                                resolve();
-                            });
-
                             controlChar.writeValue(new Uint8Array([OPCODE.ACTIVATE_IMAGE_AND_RESET]))
                             .then(function() {
                                 log('image activated and dfu target reset');
+                                // TODO: Remove this when gattserverdisconnected event is implemented and possibly put a timeout in that event handler before resolving
+                                setTimeout(function() {
+                                    if (server.connected === true) {
+                                        server.disconnect();
+                                    }
+                                    disconnectHandler();
+                                }, 5000);
                             })
                             .catch(function(error) {
                                 error = "error resetting: " + error;
