@@ -38,7 +38,7 @@ $ node example_node <device-type>
 
 Where ```<device-type>``` is one of ```nrf51``` or ```nrf52```.
 
-## Updating the SoftDevice or Bootloader (nRF52 only)
+## Updating the SoftDevice or Bootloader
 
 The ```.hex``` files below can be transferred via DFU to test SoftDevice and Bootloader updates respectivley:
 
