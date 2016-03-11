@@ -9,6 +9,7 @@
         input { font-size: 20px; }
         button { font-size: 20px; padding: 0 20px; display: block; margin: 20px auto; }
         .device-type { width: 160px; margin: 20px auto; white-space: nowrap; }
+        #results { height: 300px; overflow: auto; border: 1px solid lightgray; margin: 5px; }
     </style>
 </head>
 <body>
@@ -36,6 +37,7 @@
         function log(message) {
             console.log(message);
             resultsEl.innerText += message + "\n";
+            resultsEl.scrollTop = resultsEl.scrollHeight;
         }
         dfu.addLogger(log);
         hex2bin.addLogger(log);
