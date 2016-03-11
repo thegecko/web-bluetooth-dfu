@@ -17,6 +17,8 @@ You will need an [nRF51](https://www.nordicsemi.com/Products/nRF51-DK) or [nRF52
 
 [nrf51_boot_s110.hex](https://thegecko.github.io/web-bluetooth-dfu/firmware/nrf51_boot_s110.hex) - an [mbed](http://www.mbed.com/) bootloader merged with Nordic's s110 SoftDevice
 
+[nrf51_boot_s130.hex](https://thegecko.github.io/web-bluetooth-dfu/firmware/nrf51_boot_s130.hex) - Nordic's bootloader merged with Nordic's s130 SoftDevice
+
 [nrf52_boot_s132.hex](https://thegecko.github.io/web-bluetooth-dfu/firmware/nrf52_boot_s132.hex) - Nordic's bootloader merged with Nordic's s132 SoftDevice
 
 Upon flashing the device will be in bootloader mode and ready to receive a DFU transfer.
