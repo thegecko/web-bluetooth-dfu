@@ -43,6 +43,8 @@
     }
 }(this, function(Promise, bluetooth, crc16) {
     "use strict";
+    
+    var server; // Make server a global variable (initialized in connect(). This fixes a bug in BlueZ that causes transfers to stall.
 
     var LITTLE_ENDIAN = true;
     
@@ -209,7 +211,7 @@
 
     function connect(device) {
         return new Promise(function(resolve, reject) {
-            var server = null;
+            //var server = null;
             var service = null;
             var controlChar = null;
             var packetChar = null;
