@@ -44,7 +44,9 @@
 }(this, function(Promise, bluetooth, crc16) {
     "use strict";
     
-    var server; // Make server a global variable (initialized in connect(). This fixes a bug in BlueZ that causes transfers to stall.
+    // Make server a global variable (initialized in connect().
+    // This fixes a bug in BlueZ that causes transfers to stall.
+    var currentServer = null;
 
     var LITTLE_ENDIAN = true;
     
@@ -143,8 +145,8 @@
                 log("modeData written");
                 // TODO: Remove this when gattserverdisconnected event is implemented and possibly put a timeout in that event handler before resolving
                 setTimeout(function() {
-                    if (characteristics.server.connected === true) {
-                        characteristics.server.disconnect();
+                    if (currentServer && currentServer.connected === true) {
+                        currentServer.disconnect();
                     }
                     disconnectHandler();
                 }, 5000);
@@ -211,7 +213,6 @@
 
     function connect(device) {
         return new Promise(function(resolve, reject) {
-            //var server = null;
             var service = null;
             var controlChar = null;
             var packetChar = null;
@@ -219,7 +220,6 @@
 
             function complete() {
                 resolve({
-                    server: server,
                     controlChar: controlChar,
                     packetChar: packetChar,
                     versionChar: versionChar
@@ -229,14 +229,14 @@
             device.gatt.connect()
             .then(function(gattServer) {
                 log("connected to device");
-                server = gattServer;
+                currentServer = gattServer;
                 // This delay is needed because BlueZ needs time to update it's cache.
                 return new Promise(function(resolve, reject) {
                     setTimeout(resolve, 2000);
                 });
             })
             .then(function() {
-                return server.getPrimaryService(serviceUUID);
+                return currentServer.getPrimaryService(serviceUUID);
             })
             .then(function(primaryService) {
                 log("found DFU service");
@@ -275,8 +275,6 @@
     var offset;
     function transfer(chars, arrayBuffer, imageType, majorVersion, minorVersion) {
         return new Promise(function(resolve, reject) {
-            // This should be 'chars.controlChar.service.server' but it's not implemented yet
-            var server = chars.server;
             var controlChar = chars.controlChar;
             var packetChar = chars.packetChar;
             log('using dfu version ' + majorVersion + "." + minorVersion);
@@ -289,7 +287,7 @@
                     resolve();
                 }
             }
-            server.device.addEventListener("gattserverdisconnected", disconnectHandler);
+            currentServer.device.addEventListener("gattserverdisconnected", disconnectHandler);
 
             // Set up receipts
             interval = Math.floor(arrayBuffer.byteLength / (packetSize * notifySteps));
@@ -418,8 +416,8 @@
                                 log('image activated and dfu target reset');
                                 // TODO: Remove this when gattserverdisconnected event is implemented and possibly put a timeout in that event handler before resolving
                                 setTimeout(function() {
-                                    if (server.connected === true) {
-                                        server.disconnect();
+                                    if (currentServer && currentServer.connected === true) {
+                                        currentServer.disconnect();
                                     }
                                     disconnectHandler();
                                 }, 5000);
