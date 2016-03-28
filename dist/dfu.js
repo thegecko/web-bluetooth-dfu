@@ -1,7 +1,6 @@
 /* @license
  *
  * Device firmware update with Web Bluetooth
- * Version: 0.0.2
  *
  * Protocol from:
  * http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk52.v0.9.2/bledfu_transport.html?cp=4_0_2_4_2_4
