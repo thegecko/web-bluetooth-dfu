@@ -1,9 +1,9 @@
 {
   "name": "web-bluetooth-dfu",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Device firmware update with Web Bluetooth",
   "homepage": "https://github.com/thegecko/web-bluetooth-dfu",
-  "author": "Rob Moran <rob@thegecko.org>",
+  "author": "Rob Moran <github@thegecko.org>",
   "license": "MIT",
   "main": "index.js",
   "repository": {
@@ -21,7 +21,9 @@
     "web-bluetooth"
   ],
   "dependencies": {
-    "bleat": "^0.1.0"
+    "bleat": "^0.1.0",
+    "crc-32": "^1.0.2",
+    "progress": "^2.0.0"
   },
   "devDependencies": {
     "gulp": "^3.9.1",
