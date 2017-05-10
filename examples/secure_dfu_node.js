@@ -1,8 +1,8 @@
 var fs = require('fs');
 var bluetooth = require("bleat").webbluetooth;
 var crc = require("crc-32");
-var secureDfu = require("./index");
 var progress = require('progress');
+var secureDfu = require("../index").secure;
 var bluetoothDevices = [];
 
 var dat = fs.readFileSync("test_images_update_nrf52832/dfu_test_app_hrm_s132/nrf52832_xxaa.dat");
