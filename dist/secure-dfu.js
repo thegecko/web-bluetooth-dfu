@@ -190,7 +190,7 @@
             .then(() => {
                 this.log("enabled buttonless notifications");
                 buttonChar.addEventListener("characteristicvaluechanged", this.handleNotification.bind(this));
-                return this.sendOperation(buttonChar, OPERATIONS.BUTTON_COMMAND);
+                this.sendOperation(buttonChar, OPERATIONS.BUTTON_COMMAND);
             })
             .then(() => {
                 this.log("sent dfu mode");
@@ -436,5 +436,6 @@
     secureDfu.prototype.removeEventListener = removeEventListener;
     secureDfu.prototype.dispatchEvent = dispatchEvent;
 
+    secureDfu.SERVICE_UUID = SERVICE_UUID;
     return secureDfu;
 }));

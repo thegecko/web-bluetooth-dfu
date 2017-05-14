@@ -195,7 +195,7 @@
             dfu.requestDevice(true)
             .then(device => {
                 if (!device) {
-                    setStatus("Buttonless mode set, select device again");
+                    setStatus("DFU mode set, select device again");
                     return;
                 }
                 return update(dfu, device);
