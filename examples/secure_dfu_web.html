@@ -19,11 +19,11 @@
             font-weight: 600;
         }
         #drop {
-            margin: 40px auto;
-            max-width: 640px;
-            background-color: rgba(255, 255, 255, 0.10);
             position: relative;
-            padding: 100px 0px 70px;
+            margin: 40px auto;
+            max-width: 680px;
+            background-color: rgba(255, 255, 255, 0.10);
+            padding: 120px 0px 100px;
             outline: 2px dashed #072b44;
             outline-offset: -10px;
         }
@@ -33,50 +33,49 @@
         }
         #icon {
             width: 100%;
-            height: 40px;
             fill: #d7ecfb;
-            display: block;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
+        }
+        #github {
+            fill: #d7ecfb;
+        }
+        #github:hover {
+            fill: #8bb5ba;
         }
         #file {
             width: 0.1px;
             height: 0.1px;
             opacity: 0;
-            overflow: hidden;
-            position: absolute;
             z-index: -1;
         }
         #label {
             cursor: pointer;
-            display: block;
         }
         #label:hover strong {
             color: #8bb5ba;
         }
-        #update {
+        #select {
             position: absolute;
             width: 100%;
-            z-index: 1;
             visibility: hidden;
         }
         #button {
             font-size: 12px;
-            color: #d5e8f1;
+            color: inherit;
             margin: 20px auto;
             border: 0px;
             background-color: #1b679c;
-            outline: none;
             height: 30px;
             padding: 0 30px;
             border-radius: 4px;
             text-transform: uppercase;
             cursor: pointer;
+            outline: none;
         }
         #button:hover {
             background: #2674ab;    
         }
         #status {
-            position: relative;
             margin: 20px auto;
             border: 1px solid #d7ecfb;
             width: 400px;
@@ -89,9 +88,9 @@
             height: 100%;
         }
         #transfer {
-            position: absolute;
-            line-height: 24px;
             width: 100%;
+            line-height: 24px;
+            margin-top: -24px;
         }
 	</style>
 </head>
@@ -109,15 +108,21 @@
             <span>or drag it here</span>
         </label>
 
-        <div id="update">
-            <button id="button">Update</button>
+        <div id="select">
+            <button id="button">Select Device</button>
         </div>
 
         <div id="status">
-            <div id="bar" />
-            <div id="transfer" />
+            <div id="bar"></div>
+            <div id="transfer"></div>
         </div>
     </div>
+
+    <a href="https://github.com/thegecko/web-bluetooth-dfu/">
+        <svg id="github" xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 16 16">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+    </a>
 
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/crc-32/1.0.2/crc32.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
@@ -126,7 +131,8 @@
     <script>
         let dropEl = document.getElementById("drop");
         let fileEl = document.getElementById("file");
-        let updateEl = document.getElementById("update");
+        let selectEl = document.getElementById("select");
+        let buttonEl = document.getElementById("button");
         let labelEl = document.getElementById("label");
         let statusEl = document.getElementById("status");
         let transferEl = document.getElementById("transfer");
@@ -135,22 +141,22 @@
         let package = null;
         let manifest = null;
 
-        function updateStatus(state) {
+        function setStatus(state) {
             labelEl.textContent = state;
         }
 
-        function updateTransfer(state) {
+        function setTransfer(state) {
             if (!state) {
                 statusEl.style.visibility = "hidden";
                 return;
             }
-            updateEl.style.visibility = "hidden";
+            selectEl.style.visibility = "hidden";
             statusEl.style.visibility = "visible";
             barEl.style.width = state.currentBytes / state.totalBytes * 100 + '%';
-            transferEl.textContent = `${state.currentBytes}/${state.totalBytes} bytes written`;
+            transferEl.textContent = `${state.currentBytes}/${state.totalBytes} ${state.object} bytes written`;
         }
 
-        function updatePackage(file) {
+        function setPackage(file) {
             if (!file) return;
 
             JSZip.loadAsync(file)
@@ -164,79 +170,91 @@
             })
             .then(content => {
                 manifest = JSON.parse(content).manifest;
-                updateStatus(`Package: ${file.name}`);
-                updateEl.style.visibility = "visible";
+                setStatus(`Firmware package: ${file.name}`);
+                selectEl.style.visibility = "visible";
             })
             .catch(error => {
-                updateEl.style.visibility = "hidden";
+                selectEl.style.visibility = "hidden";
                 statusEl.style.visibility = "hidden";
-                updateStatus(error);
+                setStatus(error);
             });
         }
 
-        function transfer() {
-            if (!package) return;
-            updateStatus(`Selecting device...`);
-            updateTransfer();
+        function selectDevice() {
+            setStatus("Selecting device...");
+            setTransfer();
 
             const dfu = new SecureDfu(CRC32.buf);
             dfu.addEventListener("log", event => {
                 console.log(event.message);
             });
             dfu.addEventListener("progress", event => {
-                updateTransfer(event);
+                setTransfer(event);
             });
 
-            dfu.requestDevice()
+            dfu.requestDevice(true)
             .then(device => {
-                return dfu.connect(device);
+                if (!device) {
+                    setStatus("Buttonless mode set, select device again");
+                    return;
+                }
+                return update(dfu, device);
             })
+            .catch(error => {
+                statusEl.style.visibility = "hidden";
+                setStatus(error);
+            });
+        }
+
+        function update(dfu, device) {
+            if (!package) return;
+
+            Promise.resolve()
             .then(() => {
                 for (type of ["softdevice", "bootloader", "softdevice_bootloader"]) {
                     if (manifest[type]) {
-                        return transferImage(dfu, manifest[type]);
+                        return updateFirmware(device, dfu, manifest[type], type);
                     }
                 }
             })
             .then(() => {
                 if (manifest.application) {
-                    return transferImage(dfu, manifest.application);
-                }                
+                    return updateFirmware(device, dfu, manifest.application, "application");
+                }
             })
             .then(() => {
-                updateStatus("Update complete!");
-                updateTransfer();
+                setStatus("Update complete!");
+                setTransfer();
             })
             .catch(error => {
                 statusEl.style.visibility = "hidden";
-                updateStatus(error);
+                setStatus(error);
             });
         }
 
-        function transferImage(dfu, manifest) {
+        function updateFirmware(device, dfu, manifest, type) {
+            let init = null;
+
             return package.file(manifest.dat_file).async("arraybuffer")
             .then(data => {
-                updateStatus(`Transferring init: ${manifest.dat_file}...`);
-                return dfu.transferInit(data);
-            })
-            .then(() => {
+                init = data;
                 return package.file(manifest.bin_file).async("arraybuffer");
             })
             .then(data => {
-                updateStatus(`Transferring firmware: ${manifest.bin_file}...`);
-                return dfu.transferFirmware(data);
+                setStatus(`Updating ${type}: ${manifest.bin_file}...`);
+                return dfu.update(device, init, data);
             });
         }
 
         fileEl.addEventListener("change", event => {
-            updatePackage(event.target.files[0]);                
+            setPackage(event.target.files[0]);
         });
 
         dropEl.addEventListener("drop", event => {
-            updatePackage(event.dataTransfer.files[0]);
+            setPackage(event.dataTransfer.files[0]);
         });
 
-        updateEl.addEventListener("click", transfer);
+        buttonEl.addEventListener("click", selectDevice);
 
         ["drag", "dragstart", "dragend", "dragover", "dragenter", "dragleave", "drop"].forEach(eventName => {
             dropEl.addEventListener(eventName, event => {

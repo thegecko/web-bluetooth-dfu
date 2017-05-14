@@ -46,11 +46,13 @@
     const SERVICE_UUID = 0xFE59;
     const CONTROL_UUID = "8ec90001-f315-4f60-9fb8-838830daea50";
     const PACKET_UUID = "8ec90002-f315-4f60-9fb8-838830daea50";
+    const BUTTON_UUID = "8ec90003-f315-4f60-9fb8-838830daea50";
 
     const LITTLE_ENDIAN = true;
     const PACKET_SIZE = 20;
 
     const OPERATIONS = {
+        BUTTON_COMMAND:         [0x01],
         CREATE_COMMAND:         [0x01, 0x01],
         CREATE_DATA:            [0x01, 0x02],
         RECEIPT_NOTIFICATIONS:  [0x02],
@@ -58,7 +60,7 @@
         EXECUTE:                [0x04],
         SELECT_COMMAND:         [0x06, 0x01],
         SELECT_DATA:            [0x06, 0x02],
-        RESPONSE:               [0x60]
+        RESPONSE:               [0x60, 0x20]
     };
 
     const RESPONSE = {
@@ -95,10 +97,8 @@
         this.crc32 = crc32;
         this.events = {};
         this.notifyFns = {};
-        this.connected = false;
         this.controlChar = null;
         this.packetChar = null;
-        this.buffer = null;
     }
 
     function createListenerFn(eventTypes) {
@@ -129,65 +129,163 @@
         });
     };
 
-    secureDfu.prototype.requestDevice = function(filters) {
-        if (!filters) {
-            filters = [{
-                services: [SERVICE_UUID]
-            }];
+    secureDfu.prototype.progress = function(bytes) {
+        this.dispatchEvent({
+            type: "progress",
+            object: "unknown",
+            totalBytes: 0,
+            currentBytes: bytes
+        });
+    }
+
+    secureDfu.prototype.requestDevice = function(hiddenDfu, filters) {
+        if (!hiddenDfu && !filters) {
+            filters = [{ services: [SERVICE_UUID] }];
         }
 
         return bluetooth.requestDevice({
             filters: filters,
+            acceptAllDevices: !filters,
             optionalServices: [SERVICE_UUID]
+        })
+        .then(device => {
+            if (hiddenDfu) {
+                return this.setDfuMode(device);
+            }
+            return device;
         });
     };
 
-    secureDfu.prototype.connect = function(device) {
-        let service = null;
+    secureDfu.prototype.setDfuMode = function(device) {
+        return this.gattConnect(device)
+        .then(characteristics => {
+            this.log(`found ${characteristics.length} characteristic(s)`);
 
-        device.addEventListener("gattserverdisconnected", event => {
-            this.connected = false;
-            this.controlChar = null;
-            this.packetChar = null;
-            this.buffer = null;
-            this.log("disconnected");
-        });
+            let controlChar = characteristics.find(characteristic => {
+                return (characteristic.uuid === CONTROL_UUID);
+            });
+            let packetChar = characteristics.find(characteristic => {
+                return (characteristic.uuid === PACKET_UUID);
+            });
 
-        return device.gatt.connect()
-        .then(gattServer => {
-            this.log("connected to gatt server");
-            return gattServer.getPrimaryService(SERVICE_UUID);
-        })
-        .then(primaryService => {
-            this.log("found DFU service");
-            service = primaryService;
-            return service.getCharacteristic(CONTROL_UUID);
-        })
-        .then(characteristic => {
-            this.log("found control characteristic");
-            if (!characteristic.properties.notify) {
-                throw new Error("control characterisitc does not allow notifications");
+            if (controlChar && packetChar) {
+                return device;
             }
-            this.controlChar = characteristic;
-            return characteristic.startNotifications();
+
+            let buttonChar = characteristics.find(characteristic => {
+                return (characteristic.uuid === BUTTON_UUID);
+            });
+
+            if (!buttonChar) {
+                throw new Error("Unsupported device");
+            }
+
+            // Support buttonless devices
+            this.log("found buttonless characteristic");
+            if (!buttonChar.properties.notify && !buttonChar.properties.indicate) {
+                throw new Error("Buttonless characteristic does not allow notifications");
+            }
+
+            return buttonChar.startNotifications()
+            .then(() => {
+                this.log("enabled buttonless notifications");
+                buttonChar.addEventListener("characteristicvaluechanged", this.handleNotification.bind(this));
+                return this.sendOperation(buttonChar, OPERATIONS.BUTTON_COMMAND);
+            })
+            .then(() => {
+                this.log("sent dfu mode");
+                return new Promise((resolve, reject) => {
+                    device.addEventListener("gattserverdisconnected", event => {
+                        resolve();
+                    });
+                });
+            });
+        });
+    }
+
+    secureDfu.prototype.update = function(device, init, firmware) {
+        if (!device) throw new Error("Device not specified");
+        if (!init) throw new Error("Init not specified");
+        if (!firmware) throw new Error("Firmware not specified");
+
+        return this.connect(device)
+        .then(() => {
+            this.log("transferring init");
+            return this.transferInit(init);
         })
         .then(() => {
-            this.log("enabled control notifications");
-            this.controlChar.addEventListener("characteristicvaluechanged", this.handleNotification.bind(this));
-            return service.getCharacteristic(PACKET_UUID);
+            this.log("transferring firmware");
+            return this.transferFirmware(firmware);
         })
-        .then(characteristic => {
+        .then(() => {
+            this.log("complete, disconnecting...");
+            return new Promise((resolve, reject) => {
+                device.addEventListener("gattserverdisconnected", event => {
+                    this.log("disconnected");
+                    resolve();
+                });
+           });
+        });
+    }
+
+    secureDfu.prototype.connect = function(device) {
+        device.addEventListener("gattserverdisconnected", event => {
+            this.controlChar = null;
+            this.packetChar = null;
+        });
+
+        return this.gattConnect(device)
+        .then(characteristics => {
+            this.log(`found ${characteristics.length} characteristic(s)`);
+
+            this.packetChar = characteristics.find(characteristic => {
+                return (characteristic.uuid === PACKET_UUID);
+            });
+            if (!this.packetChar) throw new Error("Unable to find packet characteristic");
             this.log("found packet characteristic");
-            this.packetChar = characteristic;
-            this.connected = true;
+
+            this.controlChar = characteristics.find(characteristic => {
+                return (characteristic.uuid === CONTROL_UUID);
+            });
+            if (!this.controlChar) throw new Error("Unable to find control characteristic");
+            this.log("found control characteristic");
+
+            if (!this.controlChar.properties.notify && !this.controlChar.properties.indicate) {
+                throw new Error("Control characteristic does not allow notifications");
+            }
+            return this.controlChar.startNotifications();
+        })
+        .then(() => {
+            this.controlChar.addEventListener("characteristicvaluechanged", this.handleNotification.bind(this));
+            this.log("enabled control notifications");
+            return device;
         });
     };
+
+    secureDfu.prototype.gattConnect = function(device) {
+        return Promise.resolve()
+        .then(() => {
+            if (device.gatt.connected) return device.gatt;
+            return device.gatt.connect();
+        })
+        .then(server => {
+            this.log("connected to gatt server");
+            return server.getPrimaryService(SERVICE_UUID)
+            .catch(error => {
+                throw new Error("Unable to find DFU service");
+            });
+        })
+        .then(service => {
+            this.log("found DFU service");
+            return service.getCharacteristics();
+        });
+    }
 
     secureDfu.prototype.handleNotification = function(event) {
         let view = event.target.value;
 
-        if (view.getUint8(0) !== OPERATIONS.RESPONSE[0]) {
-            throw new Error("unrecognised control characteristic response notification");
+        if (OPERATIONS.RESPONSE.indexOf(view.getUint8(0)) < 0) {
+            throw new Error("Unrecognised control characteristic response notification");
         }
 
         let operation = view.getUint8(1);
@@ -213,12 +311,8 @@
         }
     };
 
-    secureDfu.prototype.sendOperation = function(operation, buffer) {
+    secureDfu.prototype.sendOperation = function(characteristic, operation, buffer) {
         return new Promise((resolve, reject) => {
-            if (!this.connected) throw new Error("device not connected");
-            if (!this.controlChar) throw new Error("control characteristic not found");
-            if (!this.packetChar) throw new Error("packet characteristic not found");
-
             let size = operation.length;
             if (buffer) size += buffer.byteLength;
 
@@ -234,72 +328,80 @@
                 reject: reject
             };
 
-            this.controlChar.writeValue(value);
+            characteristic.writeValue(value);
         });
     }
 
+    secureDfu.prototype.sendControl = function(operation, buffer) {
+        return this.sendOperation(this.controlChar, operation, buffer);
+    }
+
     secureDfu.prototype.transferInit = function(buffer) {
-        return this.sendOperation(OPERATIONS.SELECT_COMMAND)
+        return this.transfer(buffer, "init", OPERATIONS.SELECT_COMMAND, OPERATIONS.CREATE_COMMAND);
+    }
+
+    secureDfu.prototype.transferFirmware = function(buffer) {
+        return this.transfer(buffer, "firmware", OPERATIONS.SELECT_DATA, OPERATIONS.CREATE_DATA);
+    }
+
+    secureDfu.prototype.transfer = function(buffer, type, selectType, createType) {
+        return this.sendControl(selectType)
         .then(response => {
 
             let maxSize = response.getUint32(0, LITTLE_ENDIAN);
             let offset = response.getUint32(4, LITTLE_ENDIAN);
             let crc = response.getInt32(8, LITTLE_ENDIAN);
 
-            if (offset === buffer.byteLength && this.checkCrc(buffer, crc)) {
+            if (type === "init" && offset === buffer.byteLength && this.checkCrc(buffer, crc)) {
                 this.log("init packet already available, skipping transfer");
                 return;
             }
 
-            this.buffer = buffer;
-            return this.transferObject(OPERATIONS.CREATE_COMMAND, maxSize, offset);
+            this.progress = function(bytes) {
+                this.dispatchEvent({
+                    type: "progress",
+                    object: type,
+                    totalBytes: buffer.byteLength,
+                    currentBytes: bytes
+                });
+            }
+            this.progress(0);
+
+            return this.transferObject(buffer, createType, maxSize, offset);
         });
     }
 
-    secureDfu.prototype.transferFirmware = function(buffer) {
-        return this.sendOperation(OPERATIONS.SELECT_DATA)
-        .then(response => {
-
-            let maxSize = response.getUint32(0, LITTLE_ENDIAN);
-            let offset = response.getUint32(4, LITTLE_ENDIAN);
-            let crc = response.getInt32(8, LITTLE_ENDIAN);
-
-            this.buffer = buffer;
-            return this.transferObject(OPERATIONS.CREATE_DATA, maxSize, offset);
-        });
-    }
-
-    secureDfu.prototype.transferObject = function(createType, maxSize, offset) {
+    secureDfu.prototype.transferObject = function(buffer, createType, maxSize, offset) {
         let start = offset - offset % maxSize;
-        let end = Math.min(start + maxSize, this.buffer.byteLength);
+        let end = Math.min(start + maxSize, buffer.byteLength);
 
         let view = new DataView(new ArrayBuffer(4));
         view.setUint32(0, end - start, LITTLE_ENDIAN);
 
-        return this.sendOperation(createType, view.buffer)
+        return this.sendControl(createType, view.buffer)
         .then(response => {
-            let data = this.buffer.slice(start, end);
+            let data = buffer.slice(start, end);
             return this.transferData(data, start);
         })
         .then(() => {
-            return this.sendOperation(OPERATIONS.CACULATE_CHECKSUM);
+            return this.sendControl(OPERATIONS.CACULATE_CHECKSUM);
         })
         .then(response => {
             let crc = response.getInt32(4, LITTLE_ENDIAN);
             let transferred = response.getUint32(0, LITTLE_ENDIAN);
-            let data = this.buffer.slice(0, transferred);
+            let data = buffer.slice(0, transferred);
 
             if (this.checkCrc(data, crc)) {
                 this.log(`written ${transferred} bytes`);
                 offset = transferred;
-                return this.sendOperation(OPERATIONS.EXECUTE);
+                return this.sendControl(OPERATIONS.EXECUTE);
             } else {
                 this.log("object failed to validate");
             }
         })
         .then(() => {
-            if (end < this.buffer.byteLength) {
-                return this.transferObject(createType, maxSize, offset);
+            if (end < buffer.byteLength) {
+                return this.transferObject(buffer, createType, maxSize, offset);
             } else {
                 this.log("transfer complete");
             }
@@ -313,11 +415,7 @@
 
         return this.packetChar.writeValue(packet)
         .then(() => {
-            this.dispatchEvent({
-                type: "progress",
-                currentBytes: offset + end,
-                totalBytes: this.buffer.byteLength
-            });
+            this.progress(offset + end);
 
             if (end < data.byteLength) {
                 return this.transferData(data, offset, end);
