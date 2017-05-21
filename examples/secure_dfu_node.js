@@ -17,7 +17,7 @@ function logError(error) {
 }
 
 function getFileName() {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         if (process.argv[2]) {
             return resolve(process.argv[2]);
         }
@@ -55,7 +55,7 @@ function downloadFile(url) {
 }
 
 function loadFile(fileName) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         var file = fs.readFileSync(fileName);
         resolve(new Uint8Array(file).buffer);
     });
@@ -97,6 +97,7 @@ function updateFirmware(dfu, package, manifest, device, type) {
 }
 
 function update() {
+    var device = null;
     var dfu = null;
     var package = null;
     var manifest = null;
@@ -144,7 +145,7 @@ function update() {
         console.log("DFU mode set");
         return bluetooth.requestDevice({
             filters: [{ services: [secureDfu.SERVICE_UUID] }],
-            deviceFound: device => {
+            deviceFound: () => {
                 // Select first device found with correct service
                 return true;
             }
@@ -153,7 +154,7 @@ function update() {
     .then(selectedDevice => {
         device = selectedDevice;
 
-        for (type of ["softdevice", "bootloader", "softdevice_bootloader"]) {
+        for (var type of ["softdevice", "bootloader", "softdevice_bootloader"]) {
             if (manifest[type]) {
                 return updateFirmware(dfu, package, manifest[type], device, type);
             }

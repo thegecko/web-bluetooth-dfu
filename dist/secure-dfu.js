@@ -102,13 +102,13 @@
     }
 
     function createListenerFn(eventTypes) {
-        return function(type, callback, capture) {
+        return function(type, callback) {
             if (eventTypes.indexOf(type) < 0) return;
             if (!this.events[type]) this.events[type] = [];
             this.events[type].push(callback);
         };
     }
-    function removeEventListener(type, callback, capture) {
+    function removeEventListener(type, callback) {
         if (!this.events[type]) return;
         let i = this.events[type].indexOf(callback);
         if (i >= 0) this.events[type].splice(i, 1);
@@ -136,7 +136,7 @@
             totalBytes: 0,
             currentBytes: bytes
         });
-    }
+    };
 
     secureDfu.prototype.requestDevice = function(hiddenDfu, filters) {
         if (!hiddenDfu && !filters) {
@@ -194,14 +194,14 @@
             })
             .then(() => {
                 this.log("sent dfu mode");
-                return new Promise((resolve, reject) => {
-                    device.addEventListener("gattserverdisconnected", event => {
+                return new Promise((resolve) => {
+                    device.addEventListener("gattserverdisconnected", () => {
                         resolve();
                     });
                 });
             });
         });
-    }
+    };
 
     secureDfu.prototype.update = function(device, init, firmware) {
         if (!device) throw new Error("Device not specified");
@@ -219,17 +219,17 @@
         })
         .then(() => {
             this.log("complete, disconnecting...");
-            return new Promise((resolve, reject) => {
-                device.addEventListener("gattserverdisconnected", event => {
+            return new Promise((resolve) => {
+                device.addEventListener("gattserverdisconnected", () => {
                     this.log("disconnected");
                     resolve();
                 });
-           });
+            });
         });
-    }
+    };
 
     secureDfu.prototype.connect = function(device) {
-        device.addEventListener("gattserverdisconnected", event => {
+        device.addEventListener("gattserverdisconnected", () => {
             this.controlChar = null;
             this.packetChar = null;
         });
@@ -271,7 +271,7 @@
         .then(server => {
             this.log("connected to gatt server");
             return server.getPrimaryService(SERVICE_UUID)
-            .catch(error => {
+            .catch(() => {
                 throw new Error("Unable to find DFU service");
             });
         })
@@ -279,7 +279,7 @@
             this.log("found DFU service");
             return service.getCharacteristics();
         });
-    }
+    };
 
     secureDfu.prototype.handleNotification = function(event) {
         let view = event.target.value;
@@ -330,19 +330,19 @@
 
             characteristic.writeValue(value);
         });
-    }
+    };
 
     secureDfu.prototype.sendControl = function(operation, buffer) {
         return this.sendOperation(this.controlChar, operation, buffer);
-    }
+    };
 
     secureDfu.prototype.transferInit = function(buffer) {
         return this.transfer(buffer, "init", OPERATIONS.SELECT_COMMAND, OPERATIONS.CREATE_COMMAND);
-    }
+    };
 
     secureDfu.prototype.transferFirmware = function(buffer) {
         return this.transfer(buffer, "firmware", OPERATIONS.SELECT_DATA, OPERATIONS.CREATE_DATA);
-    }
+    };
 
     secureDfu.prototype.transfer = function(buffer, type, selectType, createType) {
         return this.sendControl(selectType)
@@ -364,12 +364,12 @@
                     totalBytes: buffer.byteLength,
                     currentBytes: bytes
                 });
-            }
+            };
             this.progress(0);
 
             return this.transferObject(buffer, createType, maxSize, offset);
         });
-    }
+    };
 
     secureDfu.prototype.transferObject = function(buffer, createType, maxSize, offset) {
         let start = offset - offset % maxSize;
@@ -379,7 +379,7 @@
         view.setUint32(0, end - start, LITTLE_ENDIAN);
 
         return this.sendControl(createType, view.buffer)
-        .then(response => {
+        .then(() => {
             let data = buffer.slice(start, end);
             return this.transferData(data, start);
         })
@@ -406,7 +406,7 @@
                 this.log("transfer complete");
             }
         });
-    }
+    };
 
     secureDfu.prototype.transferData = function(data, offset, start) {
         start = start || 0;
@@ -421,7 +421,7 @@
                 return this.transferData(data, offset, end);
             }
         });
-    }
+    };
 
     secureDfu.prototype.checkCrc = function(buffer, crc) {
         if (!this.crc32) {
@@ -430,7 +430,7 @@
         }
 
         return crc === this.crc32(new Uint8Array(buffer));
-    }
+    };
 
     secureDfu.prototype.addEventListener = createListenerFn([ "log", "progress" ]);
     secureDfu.prototype.removeEventListener = removeEventListener;

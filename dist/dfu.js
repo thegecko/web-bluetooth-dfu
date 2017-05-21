@@ -230,7 +230,7 @@
                 log("connected to device");
                 currentServer = gattServer;
                 // This delay is needed because BlueZ needs time to update it's cache.
-                return new Promise(function(resolve, reject) {
+                return new Promise(function(resolve) {
                     setTimeout(resolve, 2000);
                 });
             })
@@ -257,7 +257,7 @@
                     versionChar = characteristic;
                     complete();
                 })
-                .catch(function(error) {
+                .catch(function() {
                     log("info: no version characteristic found");
                     complete();
                 });
