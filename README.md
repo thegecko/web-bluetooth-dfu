@@ -5,47 +5,102 @@
 [![npm](https://img.shields.io/npm/dm/web-bluetooth-dfu.svg)](https://www.npmjs.com/package/web-bluetooth-dfu)
 [![Licence MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](http://opensource.org/licenses/MIT)
 
-Device firmware update with Web Bluetooth
+Update device firmware via Nordic's DFU protocols using [Web Bluetooth](https://webbluetoothcg.github.io/web-bluetooth/).
 
-Update device firmware via [Web Bluetooth](https://webbluetoothcg.github.io/web-bluetooth/) following the protocol here:
+## Versions
 
-http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk52.v0.9.2/bledfu_transport.html?cp=4_0_2_4_2_4
+Since version 12 of Nordic's SDK, the device firmware update protocol has changed to be made secure. The protocol can be seen here:
+
+http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v12.0.0/lib_dfu_transport_ble.html
+
+Earlier protocols were insecure, so it is recommended to use the secure protocol version in this package. The insecure protocol can be seen here:
+
+http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v11.0.0/bledfu_transport.html
+
+## Features
+
+ - Supports continuation of failed transfers and skipping of any init packet if already valid
+ - Supports [Buttonless DFU](http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v13.0.0%2Fble_sdk_app_buttonless_dfu.html) activation
+ - Uses ES6 syntax assuming that all JS engines supporting Web Bluetooth are also ES6 compatible
+ - Follows the [Universal Module Definition](https://github.com/umdjs/umd) syntax to allow injection of any Web Bluetooth shim
+
+## Live Example
+
+This repo has a live web example of the secure DFU. Open this site in a [Web Bluetooth](https://webbluetoothcg.github.io/web-bluetooth/) enabled browser:
+
+https://thegecko.github.io/web-bluetooth-dfu/
+
+ - Supports drag-and-drop or uploading of firmware packages
+ - Supports unzipping of the firmware package in-browser
+ - Supports multiple firmware images in a single package (softdevice, bootloader, application)
+
+## Prerequisites
+
+[Node.js > v4.7.0](https://nodejs.org), which includes `npm`.
+
+## Installation
+
+The package is distributed using npm. To install the package in your project:
+
+```bash
+$ npm install web-bluetooth-dfu
+```
 
 ## Device Configuration
 
-You will need an [nRF51](https://www.nordicsemi.com/Products/nRF51-DK) or [nRF52](https://www.nordicsemi.com/Products/Bluetooth-Smart-Bluetooth-low-energy/nRF52-DK) development kit, flashed with the appropriate image:
+You will need a [Nordic](http://www.nordicsemi.com/) [nRF51822](http://www.nordicsemi.com/eng/Products/nRF51-DK), [nRF52832](http://www.nordicsemi.com/eng/Products/Bluetooth-low-energy/nRF52-DK) or [nRF52840](http://www.nordicsemi.com/eng/Products/nRF52840-Preview-DK) development kit running the latest softdevice. Secure DFU supports softdevices from S130.
 
-[nrf51_boot_s110.hex](https://thegecko.github.io/web-bluetooth-dfu/firmware/nrf51_boot_s110.hex) - an [mbed](http://www.mbed.com/) bootloader merged with Nordic's s110 SoftDevice
+Softdevices can be found on Nordic's site:
 
-[nrf51_boot_s130.hex](https://thegecko.github.io/web-bluetooth-dfu/firmware/nrf51_boot_s130.hex) - Nordic's bootloader merged with Nordic's s130 SoftDevice
-
-[nrf52_boot_s132.hex](https://thegecko.github.io/web-bluetooth-dfu/firmware/nrf52_boot_s132.hex) - Nordic's bootloader merged with Nordic's s132 SoftDevice
+ - [S130](http://www.nordicsemi.com/eng/Products/S130-SoftDevice) (for nRF51)
+ - [S132](http://www.nordicsemi.com/eng/Products/S132-SoftDevice) (for nRF52)
+ - [S140](http://www.nordicsemi.com/eng/Products/S140-SoftDevice) (for nRF52)
 
 Upon flashing the device will be in bootloader mode and ready to receive a DFU transfer.
 
-## Web Example
+Example packages to update can be found in the [firmware](firmware/) folder.
 
-Open this site in a [Web Bluetooth](https://webbluetoothcg.github.io/web-bluetooth/) enabled browser:
+## Device Development
 
-[https://thegecko.github.io/web-bluetooth-dfu/](https://thegecko.github.io/web-bluetooth-dfu/)
+An excellent article exists with a walkthrough of using the device firmware update here:
 
-## Node Example
+https://devzone.nordicsemi.com/blogs/1085/getting-started-with-nordics-secure-dfu-bootloader/
 
-Clone this repository, install the npm dependencies and execute.
+tl;dr
+
+__Download / Install__
+ - Download [Nordic SDK](https://developer.nordicsemi.com/nRF5_SDK/)
+ - Install [J-Link Software Package](https://www.segger.com/downloads/jlink)
+ - Install [nRF5x Command Line Tools](https://www.nordicsemi.com/eng/Products/nRF52840#Downloads) (includes nrfjprog)
+ - Install __nrfutil__: `> pip install nrfutil`
+
+__Flashing SoftDevice__
+ - Erase the chip: `> nrfjprog --family NRF52 --eraseall`
+ - Grab the relevant softdevice from website (links above) or the SDK (components/softdevice/<SoftDevice>/hex)
+ - Flash the softdevice: `> nrfjprog --family NRF52 --program <softdevice.hex> --sectorerase --reset`
+
+__Using Test DFU Bootloader__
+ - Grab the relevant bootloader from the SDK (examples/dfu/bootloader_secure_ble/<chip>/hex)
+ - Flash the bootloader: `> nrfjprog --family NRF52 --program <bootloader.hex> --sectoranduicrerase --reset`
+
+__Signing Keys__
+ - Create a [signing key](http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v13.0.0%2Fble_sdk_app_buttonless_dfu.html): `> nrfutil keys generate private.key`
+ - Generate the __.c__ file for the key: `> nrfutil keys display --key pk --format code private.key --out_file dfu_public_key.c`
+
+__Developing an Application__
+ - Ensure you have a machine with relevant build tools such as `gcc`, linux is easiest
+ - Rebuild the bootloader with your new key (Update the Makefile to use your new key file)
+ - Flash the bootloader: `> nrfjprog --family NRF52 --program <bootloader.hex> --sectoranduicrerase --reset`
+ - Build your application using your new key file
+
+__Building DFU Package__
+
+Refer to this document:
+
+http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v13.0.0%2Fble_sdk_app_dfu_bootloader.html
+
+e.g.:
 
 ```
-$ npm install
-$ node example_node <device-type>
+> nrfutil pkg generate --debug-mode --application <your_app.hex> --key-file private.key dfu_app.zip
 ```
-
-Where ```<device-type>``` is one of ```nrf51``` or ```nrf52```.
-
-## Updating the SoftDevice or Bootloader
-
-The ```.hex``` files below can be transferred via DFU to test SoftDevice and Bootloader updates respectivley:
-
-[nrf52_softdevice_only.hex](https://thegecko.github.io/web-bluetooth-dfu/firmware/nrf52_softdevice_only.hex) - Nordic's s132 SoftDevice
-
-[nrf52_bootloader_only.hex](https://thegecko.github.io/web-bluetooth-dfu/firmware/nrf52_bootloader_only.hex) - Nordic's standard bootloader
-
-Note: Currently updating the SoftDevice and Bootloader at the same time is not supported.

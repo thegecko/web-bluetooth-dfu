@@ -1,6 +1,6 @@
 machine:
   node:
-    version: 4.0.0
+    version: 4.7.0
 
 dependencies:
   post:
@@ -8,4 +8,4 @@ dependencies:
 
 test:
   override:    
-    - gulp
+    - npm run gulp

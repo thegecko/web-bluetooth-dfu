@@ -1,10 +1,14 @@
-var gulp = require('gulp');
-var jshint = require('gulp-jshint');
+var gulp = require("gulp");
+var eslint = require("gulp-eslint");
 
-gulp.task('lint', function() {
-    return gulp.src(['dist/*.js'])
-        .pipe(jshint())
-        .pipe(jshint.reporter('default'));
+gulp.task("lint", function() {
+    return gulp.src([
+        "dist/*.js",
+        "examples/*.js"
+    ])
+    .pipe(eslint(".eslintrc"))
+    .pipe(eslint.format())
+    .pipe(eslint.failOnError());
 });
 
-gulp.task('default', ['lint']);
+gulp.task("default", ["lint"]);

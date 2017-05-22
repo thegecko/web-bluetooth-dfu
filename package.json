@@ -1,9 +1,9 @@
 {
   "name": "web-bluetooth-dfu",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Device firmware update with Web Bluetooth",
   "homepage": "https://github.com/thegecko/web-bluetooth-dfu",
-  "author": "Rob Moran <rob@thegecko.org>",
+  "author": "Rob Moran <github@thegecko.org>",
   "license": "MIT",
   "main": "index.js",
   "repository": {
@@ -20,11 +20,18 @@
     "nordic",
     "web-bluetooth"
   ],
+  "scripts": {
+    "example": "node examples/secure_dfu_node.js",
+    "gulp": "gulp"
+  },
   "dependencies": {
-    "bleat": "^0.1.0"
+    "bleat": "^0.1.3"
   },
   "devDependencies": {
+    "crc-32": "^1.0.2",
     "gulp": "^3.9.1",
-    "gulp-jshint": "^1.9.0"
+    "gulp-eslint": "^3.0.1",
+    "jszip": "^3.1.3",
+    "progress": "^2.0.0"
   }
 }

@@ -1,5 +1,5 @@
-var dfu = require('./index').dfu;
-var hex2bin = require('./index').hex2bin;
+var dfu = require('../index').dfu;
+var hex2bin = require('../index').hex2bin;
 var fs = require('fs');
 
 var log = console.log;
@@ -30,10 +30,10 @@ switch(deviceType) {
 dfu.findDevice({ services: [0x180D] })
 .then(device => {
     fileName = fileMask.replace("{0}", device.name === "Hi_Rob" ? "bye" : "hi");
-	log("found device: " + device.name);
+    log("found device: " + device.name);
     log("using file name: " + fileName);
 
-	return dfu.writeMode(device);
+    return dfu.writeMode(device);
 })
 .then(() => dfu.findDevice({ name: "DfuTarg" }))
 .then(device => {

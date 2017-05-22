@@ -3,11 +3,11 @@
  * Device firmware update with Web Bluetooth
  *
  * Protocol from:
- * http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk52.v0.9.2/bledfu_transport.html?cp=4_0_2_4_2_4
+ * http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v11.0.0/bledfu_transport.html
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2016 Rob Moran
+ * Copyright (c) 2017 Rob Moran
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -42,13 +42,13 @@
     }
 }(this, function(Promise, bluetooth, crc16) {
     "use strict";
-    
+
     // Make server a global variable (initialized in connect().
     // This fixes a bug in BlueZ that causes transfers to stall.
     var currentServer = null;
 
     var LITTLE_ENDIAN = true;
-    
+
     var packetSize = 20;
     var notifySteps = 40;
 
@@ -64,7 +64,7 @@
         SoftDevice_Bootloader: 3, // Will not work right now
         Application: 4
     };
-    
+
     // TODO: This should be configurable by the user. For now this will work with any of Nordic's SDK examples.
     var initPacket = {
         device_type: 0xFFFF,
@@ -74,7 +74,7 @@
         softdevice: 0xFFFE,
         crc: 0x0000
     };
-    
+
     var OPCODE = {
         RESERVED: 0,
         START_DFU: 1,
@@ -112,7 +112,7 @@
      * Switch to bootloader/DFU mode by writing to the control point of the DFU Service.
      * The DFU Controller is not responsible for disconnecting from the application (DFU Target) after the write.
      * The application (DFU Target) will issue a GAP Disconnect and reset into bootloader/DFU mode.
-     * 
+     *
      * https://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v11.0.0/bledfu_appswitching.html?cp=4_0_0_4_1_3_2_2
      */
     function writeMode(device) {
@@ -162,7 +162,7 @@
      * Contains basic functionality for performing safety checks on software updates for nRF5 based devices.
      * Init packet used for pre-checking to ensure the following image is compatible with the device.
      * Contains information on device type, revision, and supported SoftDevices along with a CRC or hash of firmware image.
-     * 
+     *
      * Not used in mbed bootloader (init packet was optional in SDK v6.x).
      */
     function generateInitPacket() {
@@ -230,7 +230,7 @@
                 log("connected to device");
                 currentServer = gattServer;
                 // This delay is needed because BlueZ needs time to update it's cache.
-                return new Promise(function(resolve, reject) {
+                return new Promise(function(resolve) {
                     setTimeout(resolve, 2000);
                 });
             })
@@ -257,7 +257,7 @@
                     versionChar = characteristic;
                     complete();
                 })
-                .catch(function(error) {
+                .catch(function() {
                     log("info: no version characteristic found");
                     complete();
                 });
@@ -331,7 +331,7 @@
 
             function handleControl(event) {
                 var view = event.target.value;
-                
+
                 var opCode = view.getUint8(0);
                 var req_opcode = view.getUint8(1);
                 var resp_code = view.getUint8(2);
@@ -342,7 +342,7 @@
                         log(err);
                         return reject(err);
                     }
-                    
+
                     switch(req_opcode) {
                         case OPCODE.START_DFU:
                         case OPCODE.INITIALIZE_DFU_PARAMETERS:
@@ -362,14 +362,14 @@
                                 });
                                 break;
                             }
- 
+
                             log('send packet count');
 
                             var buffer = new ArrayBuffer(3);
                             view = new DataView(buffer);
                             view.setUint8(0, OPCODE.PACKET_RECEIPT_NOTIFICATION_REQUEST);
                             view.setUint16(1, interval, LITTLE_ENDIAN);
-    
+
                             controlChar.writeValue(view)
                             .then(function() {
                                 log("sent packet count: " + interval);
@@ -399,7 +399,7 @@
                             var bytesReceived = view.getUint32(3, LITTLE_ENDIAN);
                             log('length: ' + bytesReceived);
                             log('validate...');
-    
+
                             controlChar.writeValue(new Uint8Array([OPCODE.VALIDATE_FIRMWARE]))
                             .catch(function(error) {
                                 error = "error validating: " + error;
