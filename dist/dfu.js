@@ -1,9 +1,9 @@
 /* @license
  *
- * Device firmware update with Web Bluetooth
+ * Secure device firmware update with Web Bluetooth
  *
  * Protocol from:
- * http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v11.0.0/bledfu_transport.html
+ * http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v13.0.0/lib_dfu_transport_ble.html
  *
  * The MIT License (MIT)
  *
@@ -31,440 +31,410 @@
 // https://github.com/umdjs/umd
 (function (root, factory) {
     if (typeof define === 'function' && define.amd) {
-        // AMD. Register as an anonymous module.
-        define(['es6-promise', 'bleat', 'crc16'], factory);
+        // AMD. Unsupported
     } else if (typeof exports === 'object') {
         // Node. Does not work with strict CommonJS
-        module.exports = factory(Promise, require('bleat').webbluetooth, require('./crc16'));
+        module.exports = factory(require('webbluetooth').bluetooth);
     } else {
         // Browser globals with support for web workers (root is window)
-        root.dfu = factory(Promise, root.navigator.bluetooth, root.crc16);
+        root.SecureDfu = factory(root.navigator.bluetooth);
     }
-}(this, function(Promise, bluetooth, crc16) {
+}(this, function(bluetooth) {
     "use strict";
 
-    // Make server a global variable (initialized in connect().
-    // This fixes a bug in BlueZ that causes transfers to stall.
-    var currentServer = null;
+    const SERVICE_UUID = 0xFE59;
+    const CONTROL_UUID = "8ec90001-f315-4f60-9fb8-838830daea50";
+    const PACKET_UUID = "8ec90002-f315-4f60-9fb8-838830daea50";
+    const BUTTON_UUID = "8ec90003-f315-4f60-9fb8-838830daea50";
 
-    var LITTLE_ENDIAN = true;
+    const LITTLE_ENDIAN = true;
+    const PACKET_SIZE = 20;
 
-    var packetSize = 20;
-    var notifySteps = 40;
-
-    var serviceUUID = "00001530-1212-efde-1523-785feabcd123";
-    var controlUUID = "00001531-1212-efde-1523-785feabcd123";
-    var packetUUID = "00001532-1212-efde-1523-785feabcd123";
-    var versionUUID = "00001534-1212-efde-1523-785feabcd123";
-
-    var ImageType = {
-        None: 0,
-        SoftDevice: 1,
-        Bootloader: 2,
-        SoftDevice_Bootloader: 3, // Will not work right now
-        Application: 4
+    const OPERATIONS = {
+        BUTTON_COMMAND:         [0x01],
+        CREATE_COMMAND:         [0x01, 0x01],
+        CREATE_DATA:            [0x01, 0x02],
+        RECEIPT_NOTIFICATIONS:  [0x02],
+        CACULATE_CHECKSUM:      [0x03],
+        EXECUTE:                [0x04],
+        SELECT_COMMAND:         [0x06, 0x01],
+        SELECT_DATA:            [0x06, 0x02],
+        RESPONSE:               [0x60, 0x20]
     };
 
-    // TODO: This should be configurable by the user. For now this will work with any of Nordic's SDK examples.
-    var initPacket = {
-        device_type: 0xFFFF,
-        device_rev: 0xFFFF,
-        app_version: 0xFFFFFFFF,
-        softdevice_len: 0x0001,
-        softdevice: 0xFFFE,
-        crc: 0x0000
+    const RESPONSE = {
+        0x00: "Invalid code",               // Invalid opcode.
+        0x01: "Success",                    // Operation successful.
+        0x02: "Opcode not supported",       // Opcode not supported.
+        0x03: "Invalid parameter",          // Missing or invalid parameter value.
+        0x04: "Insufficient resources",     // Not enough memory for the data object.
+        0x05: "Invalid object",             // Data object does not match the firmware and hardware requirements, the signature is wrong, or parsing the command failed.
+        0x07: "Unsupported type",           // Not a valid object type for a Create request.
+        0x08: "Operation not permitted",    // The state of the DFU process does not allow this operation.
+        0x0A: "Operation failed",           // Operation failed.
+        0x0B: "Extended error"              // Extended error.
     };
 
-    var OPCODE = {
-        RESERVED: 0,
-        START_DFU: 1,
-        INITIALIZE_DFU_PARAMETERS: 2,
-        RECEIVE_FIRMWARE_IMAGE: 3,
-        VALIDATE_FIRMWARE: 4,
-        ACTIVATE_IMAGE_AND_RESET: 5,
-        RESET_SYSTEM: 6,
-        REPORT_RECEIVED_IMAGE_SIZE: 7,
-        PACKET_RECEIPT_NOTIFICATION_REQUEST: 8,
-        RESPONSE_CODE: 16,
-        PACKET_RECEIPT_NOTIFICATION: 17
+    const EXTENDED_ERROR = {
+        0x00: "No error",                   // No extended error code has been set. This error indicates an implementation problem.
+        0x01: "Invalid error code",         // Invalid error code. This error code should never be used outside of development.
+        0x02: "Wrong command format",       // The format of the command was incorrect.
+        0x03: "Unknown command",            // The command was successfully parsed, but it is not supported or unknown.
+        0x04: "Init command invalid",       // The init command is invalid. The init packet either has an invalid update type or it is missing required fields for the update type.
+        0x05: "Firmware version failure",   // The firmware version is too low. For an application, the version must be greater than the current application. For a bootloader, it must be greater than or equal to the current version.
+        0x06: "Hardware version failure",   // The hardware version of the device does not match the required hardware version for the update.
+        0x07: "Softdevice version failure", // The array of supported SoftDevices for the update does not contain the FWID of the current SoftDevice.
+        0x08: "Signature missing",          // The init packet does not contain a signature.
+        0x09: "Wrong hash type",            // The hash type that is specified by the init packet is not supported by the DFU bootloader.
+        0x0A: "Hash failed",                // The hash of the firmware image cannot be calculated.
+        0x0B: "Wrong signature type",       // The type of the signature is unknown or not supported by the DFU bootloader.
+        0x0C: "Verification failed",        // The hash of the received firmware image does not match the hash in the init packet.
+        0x0D: "Insufficient space"          // The available space on the device is insufficient to hold the firmware.
     };
 
-    var loggers = [];
-    function addLogger(loggerFn) {
-        if (typeof loggerFn === "function") {
-            loggers.push(loggerFn);
+    function secureDfu(crc32) {
+        this.crc32 = crc32;
+        this.events = {};
+        this.notifyFns = {};
+        this.controlChar = null;
+        this.packetChar = null;
+    }
+
+    function createListenerFn(eventTypes) {
+        return function(type, callback) {
+            if (eventTypes.indexOf(type) < 0) return;
+            if (!this.events[type]) this.events[type] = [];
+            this.events[type].push(callback);
+        };
+    }
+    function removeEventListener(type, callback) {
+        if (!this.events[type]) return;
+        let i = this.events[type].indexOf(callback);
+        if (i >= 0) this.events[type].splice(i, 1);
+        if (this.events[type].length === 0) delete this.events[type];
+    }
+    function dispatchEvent(event) {
+        if (!this.events[event.type]) return;
+        event.target = this;
+        this.events[event.type].forEach(callback => {
+            if (typeof callback === "function") callback(event);
+        });
+    }
+
+    secureDfu.prototype.log = function(message) {
+        this.dispatchEvent({
+            type: "log",
+            message: message
+        });
+    };
+
+    secureDfu.prototype.progress = function(bytes) {
+        this.dispatchEvent({
+            type: "progress",
+            object: "unknown",
+            totalBytes: 0,
+            currentBytes: bytes
+        });
+    };
+
+    secureDfu.prototype.requestDevice = function(hiddenDfu, filters) {
+        if (!hiddenDfu && !filters) {
+            filters = [{ services: [SERVICE_UUID] }];
         }
-    }
-    function log(message) {
-        loggers.forEach(function(logger) {
-            logger(message);
-        });
-    }
 
-    function findDevice(filters) {
         return bluetooth.requestDevice({
-            filters: [ filters ],
-            optionalServices: [serviceUUID]
-        });
-    }
-
-    /**
-     * Switch to bootloader/DFU mode by writing to the control point of the DFU Service.
-     * The DFU Controller is not responsible for disconnecting from the application (DFU Target) after the write.
-     * The application (DFU Target) will issue a GAP Disconnect and reset into bootloader/DFU mode.
-     *
-     * https://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v11.0.0/bledfu_appswitching.html?cp=4_0_0_4_1_3_2_2
-     */
-    function writeMode(device) {
-        return new Promise(function(resolve, reject) {
-
-            var resolved = false;
-            function disconnectHandler() {
-                if (!resolved) {
-                    resolved = true;
-                    log("DFU target issued GAP disconnect and reset into bootloader/DFU mode");
-                    resolve(device);
-                }
+            filters: filters,
+            acceptAllDevices: !filters,
+            optionalServices: [SERVICE_UUID]
+        })
+        .then(device => {
+            if (hiddenDfu) {
+                return this.setDfuMode(device);
             }
-            device.addEventListener("gattserverdisconnected", disconnectHandler);
-
-            var characteristics = null;
-
-            connect(device)
-            .then(function(chars) {
-                log("enabling notifications");
-                characteristics = chars;
-                return characteristics.controlChar.startNotifications();
-            })
-            .then(function() {
-                log("writing modeData");
-                return characteristics.controlChar.writeValue(new Uint8Array([OPCODE.START_DFU, ImageType.Application]));
-            })
-            .then(function() {
-                log("modeData written");
-                // TODO: Remove this when gattserverdisconnected event is implemented and possibly put a timeout in that event handler before resolving
-                setTimeout(function() {
-                    if (currentServer && currentServer.connected === true) {
-                        currentServer.disconnect();
-                    }
-                    disconnectHandler();
-                }, 5000);
-            })
-            .catch(function(error) {
-                error = "writeMode error: " + error;
-                log(error);
-                reject(error);
-            });
+            return device;
         });
-    }
+    };
 
-    /**
-     * Contains basic functionality for performing safety checks on software updates for nRF5 based devices.
-     * Init packet used for pre-checking to ensure the following image is compatible with the device.
-     * Contains information on device type, revision, and supported SoftDevices along with a CRC or hash of firmware image.
-     *
-     * Not used in mbed bootloader (init packet was optional in SDK v6.x).
-     */
-    function generateInitPacket() {
-        var buffer = new ArrayBuffer(14);
-        var view = new DataView(buffer);
-        view.setUint16(0, initPacket.device_type, LITTLE_ENDIAN);
-        view.setUint16(2, initPacket.device_rev, LITTLE_ENDIAN);
-        view.setUint32(4, initPacket.app_version, LITTLE_ENDIAN); // Application version for the image software. This field allows for additional checking, for example ensuring that a downgrade is not allowed.
-        view.setUint16(8, initPacket.softdevice_len, LITTLE_ENDIAN); // Number of different SoftDevice revisions compatible with this application.
-        view.setUint16(10, initPacket.softdevice, LITTLE_ENDIAN); // Variable length array of SoftDevices compatible with this application. The length of the array is specified in the length (softdevice_len) field. 0xFFFE indicates any SoftDevice.
-        view.setUint16(12, initPacket.crc, LITTLE_ENDIAN);
-        return view;
-    }
+    secureDfu.prototype.setDfuMode = function(device) {
+        return this.gattConnect(device)
+        .then(characteristics => {
+            this.log(`found ${characteristics.length} characteristic(s)`);
 
-    function provision(device, arrayBuffer, imageType, crc) {
-        return new Promise(function(resolve, reject) {
-            imageType = imageType || ImageType.Application;
-            initPacket.crc = crc || crc16(arrayBuffer);
-            var versionChar = null;
+            let controlChar = characteristics.find(characteristic => {
+                return (characteristic.uuid === CONTROL_UUID);
+            });
+            let packetChar = characteristics.find(characteristic => {
+                return (characteristic.uuid === PACKET_UUID);
+            });
 
-            connect(device)
-            .then(function(chars) {
-                versionChar = chars.versionChar;
-                // Older DFU implementations (from older Nordic SDKs < 7.0) have no DFU Version characteristic.
-                if (versionChar) {
-                    return versionChar.readValue()
-                    .then(function(data) {
-                        log('read versionChar');
-                        var major = data.getUint8(0);
-                        var minor = data.getUint8(1);
-                        return transfer(chars, arrayBuffer, imageType, major, minor);
+            if (controlChar && packetChar) {
+                return device;
+            }
+
+            let buttonChar = characteristics.find(characteristic => {
+                return (characteristic.uuid === BUTTON_UUID);
+            });
+
+            if (!buttonChar) {
+                throw new Error("Unsupported device");
+            }
+
+            // Support buttonless devices
+            this.log("found buttonless characteristic");
+            if (!buttonChar.properties.notify && !buttonChar.properties.indicate) {
+                throw new Error("Buttonless characteristic does not allow notifications");
+            }
+
+            return buttonChar.startNotifications()
+            .then(() => {
+                this.log("enabled buttonless notifications");
+                buttonChar.addEventListener("characteristicvaluechanged", this.handleNotification.bind(this));
+                this.sendOperation(buttonChar, OPERATIONS.BUTTON_COMMAND);
+            })
+            .then(() => {
+                this.log("sent dfu mode");
+                return new Promise((resolve) => {
+                    device.addEventListener("gattserverdisconnected", () => {
+                        resolve();
                     });
-                } else {
-                    // Default to version 6.0 (mbed).
-                    return transfer(chars, arrayBuffer, imageType, 6, 0);
-                }
-            })
-            .then(function() {
-                resolve();
-            })
-            .catch(function(error) {
-                log(error);
-                reject(error);
+                });
             });
         });
-    }
+    };
 
-    function connect(device) {
-        return new Promise(function(resolve, reject) {
-            var service = null;
-            var controlChar = null;
-            var packetChar = null;
-            var versionChar = null;
+    secureDfu.prototype.update = function(device, init, firmware) {
+        if (!device) throw new Error("Device not specified");
+        if (!init) throw new Error("Init not specified");
+        if (!firmware) throw new Error("Firmware not specified");
 
-            function complete() {
-                resolve({
-                    controlChar: controlChar,
-                    packetChar: packetChar,
-                    versionChar: versionChar
-                });
-            }
-
-            device.gatt.connect()
-            .then(function(gattServer) {
-                log("connected to device");
-                currentServer = gattServer;
-                // This delay is needed because BlueZ needs time to update it's cache.
-                return new Promise(function(resolve) {
-                    setTimeout(resolve, 2000);
-                });
-            })
-            .then(function() {
-                return currentServer.getPrimaryService(serviceUUID);
-            })
-            .then(function(primaryService) {
-                log("found DFU service");
-                service = primaryService;
-                return service.getCharacteristic(controlUUID);
-            })
-            .then(function(characteristic) {
-                log("found control characteristic");
-                controlChar = characteristic;
-                return service.getCharacteristic(packetUUID);
-            })
-            .then(function(characteristic) {
-                log("found packet characteristic");
-                packetChar = characteristic;
-                service.getCharacteristic(versionUUID)
-                // Older DFU implementations (from older Nordic SDKs) have no DFU Version characteristic. So this may fail.
-                .then(function(characteristic) {
-                    log("found version characteristic");
-                    versionChar = characteristic;
-                    complete();
-                })
-                .catch(function() {
-                    log("info: no version characteristic found");
-                    complete();
-                });
-            })
-            .catch(function(error) {
-                error = "connect error: " + error;
-                log(error);
-                reject(error);
-            });
-        });
-    }
-
-    var interval;
-    var offset;
-    function transfer(chars, arrayBuffer, imageType, majorVersion, minorVersion) {
-        return new Promise(function(resolve, reject) {
-            var controlChar = chars.controlChar;
-            var packetChar = chars.packetChar;
-            log('using dfu version ' + majorVersion + "." + minorVersion);
-
-            var resolved = false;
-            function disconnectHandler() {
-                if (!resolved) {
-                    resolved = true;
-                    log('disconnected and completed the DFU transfer');
+        return this.connect(device)
+        .then(() => {
+            this.log("transferring init");
+            return this.transferInit(init);
+        })
+        .then(() => {
+            this.log("transferring firmware");
+            return this.transferFirmware(firmware);
+        })
+        .then(() => {
+            this.log("complete, disconnecting...");
+            return new Promise((resolve) => {
+                device.addEventListener("gattserverdisconnected", () => {
+                    this.log("disconnected");
                     resolve();
-                }
-            }
-            currentServer.device.addEventListener("gattserverdisconnected", disconnectHandler);
-
-            // Set up receipts
-            interval = Math.floor(arrayBuffer.byteLength / (packetSize * notifySteps));
-            offset = 0;
-
-            if (!controlChar.properties.notify) {
-                var err = "controlChar missing notify property";
-                log(err);
-                return reject(err);
-            }
-
-            log("enabling notifications");
-            controlChar.startNotifications()
-            .then(function() {
-                controlChar.addEventListener('characteristicvaluechanged', handleControl);
-                log("sending imagetype: " + imageType);
-                return controlChar.writeValue(new Uint8Array([OPCODE.START_DFU, imageType]));
-            })
-            .then(function() {
-                log("sent start");
-
-                var softLength = (imageType === ImageType.SoftDevice) ? arrayBuffer.byteLength : 0;
-                var bootLength = (imageType === ImageType.Bootloader) ? arrayBuffer.byteLength : 0;
-                var appLength = (imageType === ImageType.Application) ? arrayBuffer.byteLength : 0;
-
-                var buffer = new ArrayBuffer(12);
-                var view = new DataView(buffer);
-                view.setUint32(0, softLength, LITTLE_ENDIAN);
-                view.setUint32(4, bootLength, LITTLE_ENDIAN);
-                view.setUint32(8, appLength, LITTLE_ENDIAN);
-
-                return packetChar.writeValue(view);
-            })
-            .then(function() {
-                log("sent image size: " + arrayBuffer.byteLength);
-            })
-            .catch(function(error) {
-                error = "start error: " + error;
-                log(error);
-                reject(error);
+                });
             });
-
-            function handleControl(event) {
-                var view = event.target.value;
-
-                var opCode = view.getUint8(0);
-                var req_opcode = view.getUint8(1);
-                var resp_code = view.getUint8(2);
-
-                if (opCode === OPCODE.RESPONSE_CODE) {
-                    if (resp_code !== 1) {
-                        var err = "error from control point notification, resp_code: " + resp_code;
-                        log(err);
-                        return reject(err);
-                    }
-
-                    switch(req_opcode) {
-                        case OPCODE.START_DFU:
-                        case OPCODE.INITIALIZE_DFU_PARAMETERS:
-                            if(req_opcode === OPCODE.START_DFU && majorVersion > 6) { // init packet is not used in SDK v6 (so not used in mbed).
-                                log('write init packet');
-                                controlChar.writeValue(new Uint8Array([OPCODE.INITIALIZE_DFU_PARAMETERS, 0]))
-                                .then(function() {
-                                    return packetChar.writeValue(generateInitPacket());
-                                })
-                                .then(function() {
-                                    return controlChar.writeValue(new Uint8Array([OPCODE.INITIALIZE_DFU_PARAMETERS, 1]));
-                                })
-                                .catch(function(error) {
-                                    error = "error writing dfu init parameters: " + error;
-                                    log(error);
-                                    reject(error);
-                                });
-                                break;
-                            }
-
-                            log('send packet count');
-
-                            var buffer = new ArrayBuffer(3);
-                            view = new DataView(buffer);
-                            view.setUint8(0, OPCODE.PACKET_RECEIPT_NOTIFICATION_REQUEST);
-                            view.setUint16(1, interval, LITTLE_ENDIAN);
-
-                            controlChar.writeValue(view)
-                            .then(function() {
-                                log("sent packet count: " + interval);
-                                return controlChar.writeValue(new Uint8Array([OPCODE.RECEIVE_FIRMWARE_IMAGE]));
-                            })
-                            .then(function() {
-                                log("sent receive");
-                                return writePacket(packetChar, arrayBuffer, 0);
-                            })
-                            .catch(function(error) {
-                                error = "error sending packet count: " + error;
-                                log(error);
-                                reject(error);
-                            });
-                            break;
-                        case OPCODE.RECEIVE_FIRMWARE_IMAGE:
-                            log('check length');
-
-                            controlChar.writeValue(new Uint8Array([OPCODE.REPORT_RECEIVED_IMAGE_SIZE]))
-                            .catch(function(error) {
-                                error = "error checking length: " + error;
-                                log(error);
-                                reject(error);
-                            });
-                            break;
-                        case OPCODE.REPORT_RECEIVED_IMAGE_SIZE:
-                            var bytesReceived = view.getUint32(3, LITTLE_ENDIAN);
-                            log('length: ' + bytesReceived);
-                            log('validate...');
-
-                            controlChar.writeValue(new Uint8Array([OPCODE.VALIDATE_FIRMWARE]))
-                            .catch(function(error) {
-                                error = "error validating: " + error;
-                                log(error);
-                                reject(error);
-                            });
-                            break;
-                        case OPCODE.VALIDATE_FIRMWARE:
-                            log('complete, reset...');
-
-                            controlChar.writeValue(new Uint8Array([OPCODE.ACTIVATE_IMAGE_AND_RESET]))
-                            .then(function() {
-                                log('image activated and dfu target reset');
-                                // TODO: Remove this when gattserverdisconnected event is implemented and possibly put a timeout in that event handler before resolving
-                                setTimeout(function() {
-                                    if (currentServer && currentServer.connected === true) {
-                                        currentServer.disconnect();
-                                    }
-                                    disconnectHandler();
-                                }, 5000);
-                            })
-                            .catch(function(error) {
-                                error = "error resetting: " + error;
-                                log(error);
-                                reject(error);
-                            });
-                            break;
-                        default:
-                            log('unexpected req opCode - ERROR');
-                            break;
-                    }
-
-                } else if (opCode === OPCODE.PACKET_RECEIPT_NOTIFICATION) {
-                    var bytes = view.getUint32(1, LITTLE_ENDIAN);
-                    log('transferred: ' + bytes);
-                    writePacket(packetChar, arrayBuffer, 0);
-                }
-            }
         });
-    }
+    };
 
-    function writePacket(packetChar, arrayBuffer, count) {
-        var size = (offset + packetSize > arrayBuffer.byteLength) ? arrayBuffer.byteLength - offset : packetSize;
-        var packet = arrayBuffer.slice(offset, offset + size);
-        var view = new Uint8Array(packet);
+    secureDfu.prototype.connect = function(device) {
+        device.addEventListener("gattserverdisconnected", () => {
+            this.controlChar = null;
+            this.packetChar = null;
+        });
 
-        packetChar.writeValue(view)
-        .then(function() {
-            count ++;
-            offset += packetSize;
-            if (count < interval && offset < arrayBuffer.byteLength) {
-                writePacket(packetChar, arrayBuffer, count);
+        return this.gattConnect(device)
+        .then(characteristics => {
+            this.log(`found ${characteristics.length} characteristic(s)`);
+
+            this.packetChar = characteristics.find(characteristic => {
+                return (characteristic.uuid === PACKET_UUID);
+            });
+            if (!this.packetChar) throw new Error("Unable to find packet characteristic");
+            this.log("found packet characteristic");
+
+            this.controlChar = characteristics.find(characteristic => {
+                return (characteristic.uuid === CONTROL_UUID);
+            });
+            if (!this.controlChar) throw new Error("Unable to find control characteristic");
+            this.log("found control characteristic");
+
+            if (!this.controlChar.properties.notify && !this.controlChar.properties.indicate) {
+                throw new Error("Control characteristic does not allow notifications");
+            }
+            return this.controlChar.startNotifications();
+        })
+        .then(() => {
+            this.controlChar.addEventListener("characteristicvaluechanged", this.handleNotification.bind(this));
+            this.log("enabled control notifications");
+            return device;
+        });
+    };
+
+    secureDfu.prototype.gattConnect = function(device) {
+        return Promise.resolve()
+        .then(() => {
+            if (device.gatt.connected) return device.gatt;
+            return device.gatt.connect();
+        })
+        .then(server => {
+            this.log("connected to gatt server");
+            return server.getPrimaryService(SERVICE_UUID)
+            .catch(() => {
+                throw new Error("Unable to find DFU service");
+            });
+        })
+        .then(service => {
+            this.log("found DFU service");
+            return service.getCharacteristics();
+        });
+    };
+
+    secureDfu.prototype.handleNotification = function(event) {
+        let view = event.target.value;
+
+        if (OPERATIONS.RESPONSE.indexOf(view.getUint8(0)) < 0) {
+            throw new Error("Unrecognised control characteristic response notification");
+        }
+
+        let operation = view.getUint8(1);
+        if (this.notifyFns[operation]) {
+            let result = view.getUint8(2);
+            let error = null;
+
+            if (result === 0x01) {
+                let data = new DataView(view.buffer, 3);
+                this.notifyFns[operation].resolve(data);
+            } else if (result === 0x0B) {
+                let code = view.getUint8(3);
+                error = `Error: ${EXTENDED_ERROR[code]}`;
+            } else {
+                error = `Error: ${RESPONSE[result]}`;
+            }
+
+            if (error) {
+                this.log(`notify: ${error}`);
+                this.notifyFns[operation].reject(error);
+            }
+            delete this.notifyFns[operation];
+        }
+    };
+
+    secureDfu.prototype.sendOperation = function(characteristic, operation, buffer) {
+        return new Promise((resolve, reject) => {
+            let size = operation.length;
+            if (buffer) size += buffer.byteLength;
+
+            let value = new Uint8Array(size);
+            value.set(operation);
+            if (buffer) {
+                let data = new Uint8Array(buffer);
+                value.set(data, operation.length);
+            }
+
+            this.notifyFns[operation[0]] = {
+                resolve: resolve,
+                reject: reject
+            };
+
+            characteristic.writeValue(value);
+        });
+    };
+
+    secureDfu.prototype.sendControl = function(operation, buffer) {
+        return this.sendOperation(this.controlChar, operation, buffer);
+    };
+
+    secureDfu.prototype.transferInit = function(buffer) {
+        return this.transfer(buffer, "init", OPERATIONS.SELECT_COMMAND, OPERATIONS.CREATE_COMMAND);
+    };
+
+    secureDfu.prototype.transferFirmware = function(buffer) {
+        return this.transfer(buffer, "firmware", OPERATIONS.SELECT_DATA, OPERATIONS.CREATE_DATA);
+    };
+
+    secureDfu.prototype.transfer = function(buffer, type, selectType, createType) {
+        return this.sendControl(selectType)
+        .then(response => {
+
+            let maxSize = response.getUint32(0, LITTLE_ENDIAN);
+            let offset = response.getUint32(4, LITTLE_ENDIAN);
+            let crc = response.getInt32(8, LITTLE_ENDIAN);
+
+            if (type === "init" && offset === buffer.byteLength && this.checkCrc(buffer, crc)) {
+                this.log("init packet already available, skipping transfer");
+                return;
+            }
+
+            this.progress = function(bytes) {
+                this.dispatchEvent({
+                    type: "progress",
+                    object: type,
+                    totalBytes: buffer.byteLength,
+                    currentBytes: bytes
+                });
+            };
+            this.progress(0);
+
+            return this.transferObject(buffer, createType, maxSize, offset);
+        });
+    };
+
+    secureDfu.prototype.transferObject = function(buffer, createType, maxSize, offset) {
+        let start = offset - offset % maxSize;
+        let end = Math.min(start + maxSize, buffer.byteLength);
+
+        let view = new DataView(new ArrayBuffer(4));
+        view.setUint32(0, end - start, LITTLE_ENDIAN);
+
+        return this.sendControl(createType, view.buffer)
+        .then(() => {
+            let data = buffer.slice(start, end);
+            return this.transferData(data, start);
+        })
+        .then(() => {
+            return this.sendControl(OPERATIONS.CACULATE_CHECKSUM);
+        })
+        .then(response => {
+            let crc = response.getInt32(4, LITTLE_ENDIAN);
+            let transferred = response.getUint32(0, LITTLE_ENDIAN);
+            let data = buffer.slice(0, transferred);
+
+            if (this.checkCrc(data, crc)) {
+                this.log(`written ${transferred} bytes`);
+                offset = transferred;
+                return this.sendControl(OPERATIONS.EXECUTE);
+            } else {
+                this.log("object failed to validate");
             }
         })
-        .catch(function(error) {
-            error = "writePacket error: " + error;
-            log(error);
+        .then(() => {
+            if (end < buffer.byteLength) {
+                return this.transferObject(buffer, createType, maxSize, offset);
+            } else {
+                this.log("transfer complete");
+            }
         });
-    }
-
-    return {
-        addLogger: addLogger,
-        ImageType: ImageType,
-        findDevice: findDevice,
-        writeMode: writeMode,
-        provision: provision
     };
+
+    secureDfu.prototype.transferData = function(data, offset, start) {
+        start = start || 0;
+        let end = Math.min(start + PACKET_SIZE, data.byteLength);
+        let packet = data.slice(start, end);
+
+        return this.packetChar.writeValue(packet)
+        .then(() => {
+            this.progress(offset + end);
+
+            if (end < data.byteLength) {
+                return this.transferData(data, offset, end);
+            }
+        });
+    };
+
+    secureDfu.prototype.checkCrc = function(buffer, crc) {
+        if (!this.crc32) {
+            this.log("crc32 not found, skipping CRC check");
+            return true;
+        }
+
+        return crc === this.crc32(new Uint8Array(buffer));
+    };
+
+    secureDfu.prototype.addEventListener = createListenerFn([ "log", "progress" ]);
+    secureDfu.prototype.removeEventListener = removeEventListener;
+    secureDfu.prototype.dispatchEvent = dispatchEvent;
+
+    secureDfu.SERVICE_UUID = SERVICE_UUID;
+    return secureDfu;
 }));

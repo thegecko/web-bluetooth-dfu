@@ -5,8 +5,8 @@ var readline = require("readline");
 var crc = require("crc-32");
 var JSZip = require("jszip");
 var progress = require("progress");
-var bluetooth = require("bleat").webbluetooth;
-var secureDfu = require("../index").secure;
+var Bluetooth = require("webbluetooth").Bluetooth;
+var Dfu = require("../index");
 
 var bluetoothDevices = [];
 var progressBar = null;
@@ -15,6 +15,25 @@ function logError(error) {
     console.log(error.message || error);
     process.exit();
 }
+
+function handleDeviceFound(bluetoothDevice, selectFn) {
+    var discovered = bluetoothDevices.some(device => {
+        return (device.id === bluetoothDevice.id);
+    });
+    if (discovered) return;
+
+    if (bluetoothDevices.length === 0) {
+        process.stdin.setRawMode(true);
+        console.log("Select a device to update:");
+    }
+
+    bluetoothDevices.push({ id: bluetoothDevice.id, select: selectFn });
+    console.log(`${bluetoothDevices.length}: ${bluetoothDevice.name}`);
+}
+
+var bluetooth = new Bluetooth({
+    deviceFound: handleDeviceFound
+});
 
 function getFileName() {
     return new Promise((resolve) => {
@@ -59,21 +78,6 @@ function loadFile(fileName) {
         var file = fs.readFileSync(fileName);
         resolve(new Uint8Array(file).buffer);
     });
-}
-
-function handleDeviceFound(bluetoothDevice, selectFn) {
-    var discovered = bluetoothDevices.some(device => {
-        return (device.id === bluetoothDevice.id);
-    });
-    if (discovered) return;
-
-    if (bluetoothDevices.length === 0) {
-        process.stdin.setRawMode(true);
-        console.log("Select a device to update:");
-    }
-
-    bluetoothDevices.push({ id: bluetoothDevice.id, select: selectFn });
-    console.log(`${bluetoothDevices.length}: ${bluetoothDevice.name}`);
 }
 
 function updateFirmware(dfu, package, manifest, device, type) {
@@ -121,7 +125,7 @@ function update() {
     })
     .then(content => {
         manifest = JSON.parse(content).manifest;
-        dfu = new secureDfu(crc.buf);
+        dfu = new Dfu(crc.buf);
         dfu.addEventListener("progress", event => {
             if (progressBar && event.object === "firmware") {
                 progressBar.update(event.currentBytes / event.totalBytes);
@@ -131,7 +135,7 @@ function update() {
         console.log("Scanning for DFU devices...");
         return bluetooth.requestDevice({
             acceptAllDevices: true,
-            optionalServices: [secureDfu.SERVICE_UUID],
+            optionalServices: [Dfu.SERVICE_UUID],
             deviceFound: handleDeviceFound
         });
     })
@@ -144,7 +148,7 @@ function update() {
 
         console.log("DFU mode set");
         return bluetooth.requestDevice({
-            filters: [{ services: [secureDfu.SERVICE_UUID] }],
+            filters: [{ services: [Dfu.SERVICE_UUID] }],
             deviceFound: () => {
                 // Select first device found with correct service
                 return true;

@@ -10,7 +10,6 @@
   },
   "keywords": [
     "ble",
-    "bleat",
     "bluetooth",
     "dfu",
     "firmware",
@@ -19,9 +18,10 @@
     "web-bluetooth"
   ],
   "dependencies": {
-    "bleat": "git://github.com/thegecko/bleat.git"
+    "webbluetooth": "git://github.com/thegecko/webbluetooth.git"
   },
   "ignore": [
+    "_flash",
     "firmware",
     ".eslintrc",
     ".gitignore",
