@@ -6,7 +6,7 @@ var crc = require("crc-32");
 var JSZip = require("jszip");
 var progress = require("progress");
 var Bluetooth = require("webbluetooth").Bluetooth;
-var Dfu = require("../index");
+var secureDfu = require("../lib");
 
 var bluetoothDevices = [];
 var progressBar = null;
@@ -125,8 +125,8 @@ function update() {
     })
     .then(content => {
         manifest = JSON.parse(content).manifest;
-        dfu = new Dfu(crc.buf);
-        dfu.addEventListener("progress", event => {
+        dfu = new secureDfu(crc.buf, bluetooth);
+        dfu.addEventListener(secureDfu.EVENT_PROGRESS, event => {
             if (progressBar && event.object === "firmware") {
                 progressBar.update(event.currentBytes / event.totalBytes);
             }
@@ -135,8 +135,7 @@ function update() {
         console.log("Scanning for DFU devices...");
         return bluetooth.requestDevice({
             acceptAllDevices: true,
-            optionalServices: [Dfu.SERVICE_UUID],
-            deviceFound: handleDeviceFound
+            optionalServices: [secureDfu.SERVICE_UUID]
         });
     })
     .then(device => {
@@ -147,13 +146,7 @@ function update() {
         if (device) return device;
 
         console.log("DFU mode set");
-        return bluetooth.requestDevice({
-            filters: [{ services: [Dfu.SERVICE_UUID] }],
-            deviceFound: () => {
-                // Select first device found with correct service
-                return true;
-            }
-        });
+        return dfu.requestDevice();
     })
     .then(selectedDevice => {
         device = selectedDevice;

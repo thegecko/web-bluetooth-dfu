@@ -1,11 +1,30 @@
 machine:
   node:
-    version: 4.7.0
+    version: 4.8.0
+  environment:
+    LIVE_BRANCH: gh-pages
 
-dependencies:
-  post:
-    - npm install
+compile:
+  override:
+    - npm run gulp
 
 test:
-  override:    
-    - npm run gulp
+  override:
+    - exit 0
+
+deployment:
+  staging:
+    branch: master
+    commands:
+      - echo Syncing to $LIVE_BRANCH on GitHub...
+      - git config --global user.name thegecko
+      - git config --global user.email github@thegecko.org
+      - git add --force dist lib types
+      - git stash save
+      - git checkout $LIVE_BRANCH
+      - git merge master --no-commit
+      - git checkout stash -- .
+      - git commit --allow-empty --message "Automatic Deployment [skip ci]"
+      - git push
+      - 'echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc'
+      - npm publish || true
