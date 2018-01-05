@@ -23,10 +23,12 @@
   "ignore": [
     "_flash",
     "firmware",
-    ".eslintrc",
     ".gitignore",
     "circle.yml",
     "gulpfile.js",
+    "index.html",
+    "tsconfig.json",
+    "tslint.json",
     "package.json"
   ]
 }

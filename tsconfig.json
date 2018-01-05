@@ -1,0 +1,18 @@
+{
+    "compilerOptions": {
+        "target": "es5",
+        "module": "commonjs",
+        "lib": [
+            "dom",                      // window.navigator
+            "es5",
+            "es2015.core",              // Array.find
+            "es2015.promise",           // Promise
+            "es2015.symbol.wellknown"   // Map
+        ],
+        "alwaysStrict": true,
+        "noEmitOnError": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "declaration": true
+    }
+}
