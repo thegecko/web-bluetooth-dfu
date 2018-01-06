@@ -42,9 +42,7 @@ https://thegecko.github.io/web-bluetooth-dfu/
 
 The package is distributed using npm. To install the package in your project:
 
-```bash
-$ npm install web-bluetooth-dfu
-```
+    $ npm install web-bluetooth-dfu
 
 ## Device Configuration
 
@@ -58,7 +56,7 @@ Softdevices can be found on Nordic's site:
 
 Upon flashing the device will be in bootloader mode and ready to receive a DFU transfer.
 
-Example packages to update can be found in the [firmware](firmware/) folder.
+Example packages to update can be found in the [firmware](https://github.com/thegecko/web-bluetooth-dfu/tree/master/firmware) folder.
 
 ## Device Development
 
@@ -72,25 +70,25 @@ __Download / Install__
  - Download [Nordic SDK](https://developer.nordicsemi.com/nRF5_SDK/)
  - Install [J-Link Software Package](https://www.segger.com/downloads/jlink)
  - Install [nRF5x Command Line Tools](https://www.nordicsemi.com/eng/Products/nRF52840#Downloads) (includes nrfjprog)
- - Install __nrfutil__: `> pip install nrfutil`
+ - Install __nrfutil__: `$ pip install nrfutil`
 
 __Flashing SoftDevice__
- - Erase the chip: `> nrfjprog --family NRF52 --eraseall`
- - Grab the relevant softdevice from website (links above) or the SDK (components/softdevice/<SoftDevice>/hex)
- - Flash the softdevice: `> nrfjprog --family NRF52 --program <softdevice.hex> --sectorerase --reset`
+ - Erase the chip: `$ nrfjprog --family NRF52 --eraseall`
+ - Grab the relevant softdevice from website (links above) or the SDK (components/softdevice/\<SoftDevice\>/hex)
+ - Flash the softdevice: `$ nrfjprog --family NRF52 --program <softdevice.hex> --sectorerase --reset`
 
 __Using Test DFU Bootloader__
- - Grab the relevant bootloader from the SDK (examples/dfu/bootloader_secure_ble/<chip>/hex)
- - Flash the bootloader: `> nrfjprog --family NRF52 --program <bootloader.hex> --sectoranduicrerase --reset`
+ - Grab the relevant bootloader from the SDK (examples/dfu/bootloader_secure_ble/\<chip\>/hex)
+ - Flash the bootloader: `$ nrfjprog --family NRF52 --program <bootloader.hex> --sectoranduicrerase --reset`
 
 __Signing Keys__
- - Create a [signing key](http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v13.0.0%2Fble_sdk_app_buttonless_dfu.html): `> nrfutil keys generate private.key`
- - Generate the __.c__ file for the key: `> nrfutil keys display --key pk --format code private.key --out_file dfu_public_key.c`
+ - Create a [signing key](http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v13.0.0%2Fble_sdk_app_buttonless_dfu.html): `$ nrfutil keys generate private.key`
+ - Generate the __.c__ file for the key: `$ nrfutil keys display --key pk --format code private.key --out_file dfu_public_key.c`
 
 __Developing an Application__
  - Ensure you have a machine with relevant build tools such as `gcc`, linux is easiest
  - Rebuild the bootloader with your new key (Update the Makefile to use your new key file)
- - Flash the bootloader: `> nrfjprog --family NRF52 --program <bootloader.hex> --sectoranduicrerase --reset`
+ - Flash the bootloader: `$ nrfjprog --family NRF52 --program <bootloader.hex> --sectoranduicrerase --reset`
  - Build your application using your new key file
 
 __Building DFU Package__
@@ -101,6 +99,4 @@ http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v
 
 e.g.:
 
-```
-> nrfutil pkg generate --debug-mode --application <your_app.hex> --key-file private.key dfu_app.zip
-```
+    $ nrfutil pkg generate --debug-mode --application <your_app.hex> --key-file private.key dfu_app.zip
