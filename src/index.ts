@@ -23,5 +23,5 @@
 * SOFTWARE.
 */
 
-import dfu = require("./secure-dfu");
-module.exports = dfu.SecureDfu;
+import { SecureDfu } from "./secure-dfu";
+export = SecureDfu;
