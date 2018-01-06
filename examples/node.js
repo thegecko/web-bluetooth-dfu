@@ -28,14 +28,14 @@ var http = require("http");
 var https = require("https");
 var readline = require("readline");
 var crc = require("crc-32");
-var JSZip = require("jszip");
 var progress = require("progress");
 var webbluetooth = require("webbluetooth");
+var Package = require("./package");
 var SecureDfu = require("../");
 
 process.stdin.setEncoding("utf8");
 
-// Determine manifest URL or file path
+// Determine package URL or file path
 function getFileName() {
     return new Promise((resolve) => {
         if (process.argv[2]) {
@@ -124,44 +124,6 @@ function downloadFile(url) {
     });
 }
 
-// Firmware zip file wrapper
-function Firmware(zipFile) {
-    this.zipFile = zipFile;
-}
-Firmware.prototype.load = function() {
-    try {
-        return this.zipFile.file("manifest.json").async("string")
-        .then(content => {
-            this.manifest = JSON.parse(content).manifest;
-            return this;
-        });
-    } catch(e) {
-        throw new Error("Unable to find manifest, is this a proper DFU package?");
-    }
-};
-Firmware.prototype.getImage = function(types) {
-    for (var type of types) {
-        if (this.manifest[type]) {
-            var entry = this.manifest[type];
-            var result = {
-                type: type,
-                initFile: entry.dat_file,
-                imageFile: entry.bin_file
-            };
-
-            return this.zipFile.file(result.initFile).async("arraybuffer")
-            .then(data => {
-                result.initData = data;
-                return this.zipFile.file(result.imageFile).async("arraybuffer")
-            })
-            .then(data => {
-                result.imageData = data;
-                return result;
-            });
-        }
-    }
-}
-
 // Update device using image containing init packet and data
 function updateFirmware(dfu, device, image) {
     console.log(`Using firmware: ${image.imageFile}`);
@@ -183,7 +145,7 @@ function updateFirmware(dfu, device, image) {
 }
 
 function update() {
-    var firmware = null;
+    var package = null;
     var device = null;
     var dfu = null;
 
@@ -194,11 +156,8 @@ function update() {
         return loadFile(fileName);
     })
     .then(file => {
-        return JSZip.loadAsync(file);
-    })
-    .then(zipFile => {
-        firmware = new Firmware(zipFile);
-        return firmware.load();
+        package = new Package(file);
+        return package.load();
     })
     .then(() => {
         console.log("Scanning for DFU devices...");
@@ -219,12 +178,12 @@ function update() {
     })
     .then(selectedDevice => {
         device = selectedDevice;
-        return firmware.getImage(["softdevice", "bootloader", "softdevice_bootloader"]);
+        return package.getBaseImage();
     })
     .then(image => {
         if (image) return updateFirmware(dfu, device, image);
     })
-    .then(() => firmware.getImage(["application"]))
+    .then(() => package.getAppImage())
     .then(image => {
         if (image) return updateFirmware(dfu, device, image);
     })

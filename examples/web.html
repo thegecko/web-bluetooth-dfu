@@ -157,6 +157,7 @@
 
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/crc-32/1.0.2/crc32.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+    <script src="./package.js"></script>
     <script src="../dist/secure-dfu.js"></script>
 
     <script>
@@ -170,7 +171,6 @@
         let barEl = document.getElementById("bar");
 
         let package = null;
-        let manifest = null;
 
         function setStatus(state) {
             labelEl.textContent = state;
@@ -187,20 +187,13 @@
             transferEl.textContent = `${state.currentBytes}/${state.totalBytes} ${state.object} bytes written`;
         }
 
+        // Load a firmware package
         function setPackage(file) {
             if (!file) return;
 
-            JSZip.loadAsync(file)
-            .then(zipFile => {
-                try {
-                    package = zipFile;
-                    return zipFile.file("manifest.json").async("string");
-                } catch(e) {
-                    throw new Error("Unable to find manifest, is this a proper DFU package?");
-                }
-            })
-            .then(content => {
-                manifest = JSON.parse(content).manifest;
+            package = new SecureDfuPackage(file);
+            package.load()
+            .then(() => {
                 setStatus(`Firmware package: ${file.name}`);
                 selectEl.style.visibility = "visible";
             })
@@ -211,6 +204,7 @@
             });
         }
 
+        // Choose a device
         function selectDevice() {
             setStatus("Selecting device...");
             setTransfer();
@@ -237,20 +231,23 @@
             });
         }
 
+        // Update a device with all firmware from a package
         function update(dfu, device) {
             if (!package) return;
 
             Promise.resolve()
-            .then(() => {
-                for (type of ["softdevice", "bootloader", "softdevice_bootloader"]) {
-                    if (manifest[type]) {
-                        return updateFirmware(device, dfu, manifest[type], type);
-                    }
+            .then(() => package.getBaseImage())
+            .then(image => {
+                if (image) {
+                    setStatus(`Updating ${image.type}: ${image.imageFile}...`);
+                    return dfu.update(device, image.initData, image.imageData);
                 }
             })
-            .then(() => {
-                if (manifest.application) {
-                    return updateFirmware(device, dfu, manifest.application, "application");
+            .then(() => package.getAppImage())
+            .then(image => {
+                if (image) {
+                    setStatus(`Updating ${image.type}: ${image.imageFile}...`);
+                    return dfu.update(device, image.initData, image.imageData);
                 }
             })
             .then(() => {
@@ -260,20 +257,6 @@
             .catch(error => {
                 statusEl.style.visibility = "hidden";
                 setStatus(error);
-            });
-        }
-
-        function updateFirmware(device, dfu, manifest, type) {
-            let init = null;
-
-            return package.file(manifest.dat_file).async("arraybuffer")
-            .then(data => {
-                init = data;
-                return package.file(manifest.bin_file).async("arraybuffer");
-            })
-            .then(data => {
-                setStatus(`Updating ${type}: ${manifest.bin_file}...`);
-                return dfu.update(device, init, data);
             });
         }
 
