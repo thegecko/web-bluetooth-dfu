@@ -253,6 +253,7 @@
             .then(() => {
                 setStatus("Update complete!");
                 setTransfer();
+                fileEl.value = "";
             })
             .catch(error => {
                 statusEl.style.visibility = "hidden";

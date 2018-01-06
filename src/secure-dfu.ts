@@ -157,6 +157,7 @@ export class SecureDfu extends EventDispatcher {
 
     private connect(device: BluetoothDevice): Promise<BluetoothDevice> {
         device.addEventListener("gattserverdisconnected", () => {
+            this.notifyFns = {};
             this.controlChar = null;
             this.packetChar = null;
         });
@@ -168,18 +169,21 @@ export class SecureDfu extends EventDispatcher {
             this.packetChar = characteristics.find(characteristic => {
                 return (characteristic.uuid === PACKET_UUID);
             });
+
             if (!this.packetChar) throw new Error("Unable to find packet characteristic");
             this.log("found packet characteristic");
 
             this.controlChar = characteristics.find(characteristic => {
                 return (characteristic.uuid === CONTROL_UUID);
             });
+
             if (!this.controlChar) throw new Error("Unable to find control characteristic");
             this.log("found control characteristic");
 
             if (!this.controlChar.properties.notify && !this.controlChar.properties.indicate) {
                 throw new Error("Control characteristic does not allow notifications");
             }
+
             return this.controlChar.startNotifications();
         })
         .then(() => {
@@ -234,6 +238,7 @@ export class SecureDfu extends EventDispatcher {
                 this.log(`notify: ${error}`);
                 this.notifyFns[operation].reject(error);
             }
+
             delete this.notifyFns[operation];
         }
     }
@@ -388,7 +393,7 @@ export class SecureDfu extends EventDispatcher {
     /**
      * Sets the DFU mode of a device, preparing it for update
      * @param device The device to switch mode
-     * @returns Promise containing the device
+     * @returns Promise containing the device if it is still on a valid state
      */
     public setDfuMode(device: BluetoothDevice): Promise<BluetoothDevice> {
         return this.gattConnect(device)
@@ -398,6 +403,7 @@ export class SecureDfu extends EventDispatcher {
             const controlChar = characteristics.find(characteristic => {
                 return (characteristic.uuid === CONTROL_UUID);
             });
+
             const packetChar = characteristics.find(characteristic => {
                 return (characteristic.uuid === PACKET_UUID);
             });
@@ -420,18 +426,26 @@ export class SecureDfu extends EventDispatcher {
                 throw new Error("Buttonless characteristic does not allow notifications");
             }
 
-            return buttonChar.startNotifications()
-            .then(() => {
-                this.log("enabled buttonless notifications");
-                buttonChar.addEventListener("characteristicvaluechanged", this.handleNotification.bind(this));
-                return this.sendOperation(buttonChar, OPERATIONS.BUTTON_COMMAND);
-            })
-            .then(() => {
-                this.log("sent dfu mode");
-                return new Promise<BluetoothDevice>((resolve, _reject) => {
-                    device.addEventListener("gattserverdisconnected", () => {
-                        resolve(device);
-                    });
+            return new Promise<BluetoothDevice>((resolve, _reject) => {
+
+                function complete() {
+                    this.notifyFns = {};
+                    // Resolve with null device as it needs reconnecting
+                    resolve(null);
+                }
+
+                buttonChar.startNotifications()
+                .then(() => {
+                    this.log("enabled buttonless notifications");
+
+                    device.addEventListener("gattserverdisconnected", complete.bind(this));
+                    buttonChar.addEventListener("characteristicvaluechanged", this.handleNotification.bind(this));
+
+                    return this.sendOperation(buttonChar, OPERATIONS.BUTTON_COMMAND);
+                })
+                .then(() => {
+                    this.log("sent DFU mode");
+                    complete();
                 });
             });
         });
