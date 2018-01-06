@@ -1,3 +1,28 @@
+/*
+* Web Bluetooth DFU
+* Copyright (c) 2018 Rob Moran
+*
+* The MIT License (MIT)
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy
+* of this software and associated documentation files (the "Software"), to deal
+* in the Software without restriction, including without limitation the rights
+* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+* copies of the Software, and to permit persons to whom the Software is
+* furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included in all
+* copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+* SOFTWARE.
+*/
+
 var fs = require("fs");
 var http = require("http");
 var https = require("https");
@@ -6,7 +31,7 @@ var crc = require("crc-32");
 var JSZip = require("jszip");
 var progress = require("progress");
 var Bluetooth = require("webbluetooth").Bluetooth;
-var secureDfu = require("../lib");
+var SecureDfu = require("../").SecureDfu;
 
 var bluetoothDevices = [];
 var progressBar = null;
@@ -125,8 +150,8 @@ function update() {
     })
     .then(content => {
         manifest = JSON.parse(content).manifest;
-        dfu = new secureDfu(crc.buf, bluetooth);
-        dfu.addEventListener(secureDfu.EVENT_PROGRESS, event => {
+        dfu = new SecureDfu(crc.buf, bluetooth);
+        dfu.addEventListener(SecureDfu.EVENT_PROGRESS, event => {
             if (progressBar && event.object === "firmware") {
                 progressBar.update(event.currentBytes / event.totalBytes);
             }
@@ -135,7 +160,7 @@ function update() {
         console.log("Scanning for DFU devices...");
         return bluetooth.requestDevice({
             acceptAllDevices: true,
-            optionalServices: [secureDfu.SERVICE_UUID]
+            optionalServices: [SecureDfu.SERVICE_UUID]
         });
     })
     .then(device => {

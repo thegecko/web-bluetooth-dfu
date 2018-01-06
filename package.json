@@ -5,8 +5,11 @@
   "homepage": "https://github.com/thegecko/web-bluetooth-dfu",
   "author": "Rob Moran <github@thegecko.org>",
   "license": "MIT",
-  "types": "./types/index.d.ts",
-  "main": "./lib/index.js",
+  "types": "./types/secure-dfu.d.ts",
+  "main": "./index.js",
+  "browser": {
+    "./index.js": "./dist/secure-dfu.js"
+  },
   "repository": {
     "type": "git",
     "url": "git://github.com/thegecko/web-bluetooth-dfu.git"
