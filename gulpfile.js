@@ -27,7 +27,8 @@ var bundleIgnore = "webbluetooth";
 var watching = false;
 
 // Error handler suppresses exists during watch
-function handleError() {
+function handleError(error) {
+    console.log(error.message);
     if (watching) this.emit("end");
     else process.exit(1);
 }
@@ -46,7 +47,7 @@ gulp.task("clean", () => {
 gulp.task("lint", () => {
     var program = tslint.Linter.createProgram("./");
 
-    gulp.src(srcFiles)
+    return gulp.src(srcFiles)
     .pipe(gulpTslint({
         program: program,
         formatter: "stylish"

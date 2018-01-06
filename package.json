@@ -7,9 +7,6 @@
   "license": "MIT",
   "types": "./types/index.d.ts",
   "main": "./lib/index.js",
-  "browser": {
-    "./lib/index.js": "./dist/secure-dfu.js"
-  },
   "repository": {
     "type": "git",
     "url": "git://github.com/thegecko/web-bluetooth-dfu.git"
