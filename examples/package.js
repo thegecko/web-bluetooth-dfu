@@ -45,19 +45,19 @@
     };
 
     Package.prototype.load = function() {
-        try {
-            return JSZip.loadAsync(this.buffer)
-            .then(zipFile => {
-                this.zipFile = zipFile;
+        return JSZip.loadAsync(this.buffer)
+        .then(zipFile => {
+            this.zipFile = zipFile;
+            try {
                 return this.zipFile.file("manifest.json").async("string");
-            })
-            .then(content => {
-                this.manifest = JSON.parse(content).manifest;
-                return this;
-            });
-        } catch(e) {
-            throw new Error("Unable to find manifest, is this a proper DFU package?");
-        }
+            } catch(e) {
+                throw new Error("Unable to find manifest, is this a proper DFU package?");
+            }
+        })
+        .then(content => {
+            this.manifest = JSON.parse(content).manifest;
+            return this;
+        });
     };
 
     Package.prototype.getImage = function(types) {

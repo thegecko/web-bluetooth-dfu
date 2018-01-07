@@ -188,7 +188,7 @@ function update() {
         if (image) return updateFirmware(dfu, device, image);
     })
     .then(() => {
-        console.log("Update complete!");
+        console.log("Update complete");
         process.exit();
     })
     .catch(error => {
