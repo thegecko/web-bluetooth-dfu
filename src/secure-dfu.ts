@@ -53,33 +53,57 @@ const OPERATIONS = {
 };
 
 const RESPONSE = {
-    0x00: "Invalid code",               // Invalid opcode.
-    0x01: "Success",                    // Operation successful.
-    0x02: "Opcode not supported",       // Opcode not supported.
-    0x03: "Invalid parameter",          // Missing or invalid parameter value.
-    0x04: "Insufficient resources",     // Not enough memory for the data object.
-    0x05: "Invalid object",             // Data object does not match the firmware and hardware requirements, the signature is wrong, or parsing the command failed.
-    0x07: "Unsupported type",           // Not a valid object type for a Create request.
-    0x08: "Operation not permitted",    // The state of the DFU process does not allow this operation.
-    0x0A: "Operation failed",           // Operation failed.
-    0x0B: "Extended error"              // Extended error.
+    // Invalid code
+    0x00: "Invalid opcode",
+    // Success
+    0x01: "Operation successful",
+    // Opcode not supported
+    0x02: "Opcode not supported",
+    // Invalid parameter
+    0x03: "Missing or invalid parameter value",
+    // Insufficient resources
+    0x04: "Not enough memory for the data object",
+    // Invalid object
+    0x05: "Data object does not match the firmware and hardware requirements, the signature is wrong, or parsing the command failed",
+    // Unsupported type
+    0x07: "Not a valid object type for a Create request",
+    // Operation not permitted
+    0x08: "The state of the DFU process does not allow this operation",
+    // Operation failed
+    0x0A: "Operation failed",
+    // Extended error
+    0x0B: "Extended error"
 };
 
 const EXTENDED_ERROR = {
-    0x00: "No error",                   // No extended error code has been set. This error indicates an implementation problem.
-    0x01: "Invalid error code",         // Invalid error code. This error code should never be used outside of development.
-    0x02: "Wrong command format",       // The format of the command was incorrect.
-    0x03: "Unknown command",            // The command was successfully parsed, but it is not supported or unknown.
-    0x04: "Init command invalid",       // The init command is invalid. The init packet either has an invalid update type or it is missing required fields for the update type.
-    0x05: "Firmware version failure",   // The firmware version is too low. For an application, the version must be greater than the current application. For a bootloader, it must be greater than or equal to the current version.
-    0x06: "Hardware version failure",   // The hardware version of the device does not match the required hardware version for the update.
-    0x07: "Softdevice version failure", // The array of supported SoftDevices for the update does not contain the FWID of the current SoftDevice.
-    0x08: "Signature missing",          // The init packet does not contain a signature.
-    0x09: "Wrong hash type",            // The hash type that is specified by the init packet is not supported by the DFU bootloader.
-    0x0A: "Hash failed",                // The hash of the firmware image cannot be calculated.
-    0x0B: "Wrong signature type",       // The type of the signature is unknown or not supported by the DFU bootloader.
-    0x0C: "Verification failed",        // The hash of the received firmware image does not match the hash in the init packet.
-    0x0D: "Insufficient space"          // The available space on the device is insufficient to hold the firmware.
+    // No error
+    0x00: "No extended error code has been set. This error indicates an implementation problem",
+    // Invalid error code
+    0x01: "Invalid error code. This error code should never be used outside of development",
+    // Wrong command format
+    0x02: "The format of the command was incorrect",
+    // Unknown command
+    0x03: "The command was successfully parsed, but it is not supported or unknown",
+    // Init command invalid
+    0x04: "The init command is invalid. The init packet either has an invalid update type or it is missing required fields for the update type",
+    // Firmware version failure
+    0x05: "The firmware version is too low. For an application, the version must be greater than the current application. For a bootloader, it must be greater than or equal to the current version",
+    // Hardware version failure
+    0x06: "The hardware version of the device does not match the required hardware version for the update",
+    // Softdevice version failure
+    0x07: "The array of supported SoftDevices for the update does not contain the FWID of the current SoftDevice",
+    // Signature missing
+    0x08: "The init packet does not contain a signature",
+    // Wrong hash type
+    0x09: "The hash type that is specified by the init packet is not supported by the DFU bootloader",
+    // Hash failed
+    0x0A: "The hash of the firmware image cannot be calculated",
+    // Wrong signature type
+    0x0B: "The type of the signature is unknown or not supported by the DFU bootloader",
+    // Verification failed
+    0x0C: "The hash of the received firmware image does not match the hash in the init packet",
+    // Insufficient space
+    0x0D: "The available space on the device is insufficient to hold the firmware"
 };
 
 /**
@@ -480,7 +504,8 @@ export class SecureDfu extends EventDispatcher {
                     this.log("disconnected");
                     resolve(device);
                 });
-            });
+            })
+            .catch(error => reject(error));
         });
     }
 }
