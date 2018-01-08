@@ -1,9 +1,11 @@
 {
   "name": "web-bluetooth-dfu",
   "description": "Device firmware update with Web Bluetooth",
-  "homepage": "https://github.com/thegecko/web-bluetooth-dfu",
+  "homepage": "https://thegecko.github.io/web-bluetooth-dfu/",
   "authors": "Rob Moran <rob@thegecko.org>",
   "license": "MIT",
+  "main": "dist/secure-dfu.js",
+  "moduleType": "globals",
   "repository": {
     "type": "git",
     "url": "git://github.com/thegecko/web-bluetooth-dfu.git"
@@ -17,18 +19,12 @@
     "nordic",
     "web-bluetooth"
   ],
-  "dependencies": {
-    "webbluetooth": "git://github.com/thegecko/webbluetooth.git"
-  },
   "ignore": [
     "_flash",
     "firmware",
     ".gitignore",
     "circle.yml",
-    "gulpfile.js",
     "index.html",
-    "tsconfig.json",
-    "tslint.json",
-    "package.json"
+    ".npmignore"
   ]
 }

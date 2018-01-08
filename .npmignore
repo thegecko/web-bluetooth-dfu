@@ -2,8 +2,5 @@ _flash
 firmware
 .gitignore
 circle.yml
-gulpfile.js
 index.html
-tsconfig.json
-tslint.json
 bower.json
