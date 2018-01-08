@@ -47,7 +47,7 @@ function getFileName() {
             rl.close();
             resolve(answer);
         });
-        rl.write("firmware/dfu_test_app_hrm_s132.zip");
+        rl.write("firmware/ble_app_buttonless_dfu_s132.zip");
     });
 }
 
