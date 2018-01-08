@@ -1,6 +1,6 @@
 {
   "name": "web-bluetooth-dfu",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Device firmware update with Web Bluetooth",
   "homepage": "https://thegecko.github.io/web-bluetooth-dfu/",
   "author": "Rob Moran <github@thegecko.org>",

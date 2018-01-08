@@ -13,16 +13,14 @@ Since version 12 of Nordic's SDK, the device firmware update protocol has change
 
 http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v12.0.0/lib_dfu_transport_ble.html
 
-Earlier protocols were insecure, so it is recommended to use the secure protocol version in this package. The insecure protocol can be seen here:
-
-http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v11.0.0/bledfu_transport.html
+Earlier protocols were insecure, so it is recommended to use the secure protocol version in this package.
 
 ## Features
 
  - Supports continuation of failed transfers and skipping of any init packet if already valid
  - Supports [Buttonless DFU](http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v13.0.0%2Fble_sdk_app_buttonless_dfu.html) activation
  - Uses ES6 syntax assuming that all JS engines supporting Web Bluetooth are also ES6 compatible
- - Follows the [Universal Module Definition](https://github.com/umdjs/umd) syntax to allow injection of any Web Bluetooth shim
+ - Written with [TypeScript](https://www.typescriptlang.org/) to promote type safety
 
 ## Live Example
 
