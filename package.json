@@ -32,6 +32,7 @@
   },
   "devDependencies": {
     "@types/node": "^8.0.54",
+    "@types/web-bluetooth": "0.0.4",
     "browserify": "^15.0.0",
     "crc-32": "^1.0.2",
     "del": "^3.0.0",
@@ -47,9 +48,7 @@
     "tslint-eslint-rules": "^4.1.1",
     "typescript": "^2.6.2",
     "vinyl-buffer": "^1.0.1",
-    "vinyl-source-stream": "^2.0.0"
-  },
-  "dependencies": {
-    "webbluetooth": "^1.0.1"
+    "vinyl-source-stream": "^2.0.0",
+    "webbluetooth": "^1.0.2"
   }
 }

@@ -22,7 +22,6 @@ var typesDir = "types";
 // Browser bundles
 var bundleDir = "dist";
 var bundleGlobal = "SecureDfu";
-var bundleIgnore = "webbluetooth";
 
 var watching = false;
 
@@ -81,7 +80,6 @@ gulp.task("bundle", ["compile"], () => {
     return browserify(nodeDir, {
         standalone: bundleGlobal
     })
-    .ignore(bundleIgnore)
     .bundle()
     .on("error", handleError)
     .pipe(source(`${fileName}.js`))

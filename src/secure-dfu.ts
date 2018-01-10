@@ -23,15 +23,7 @@
 * SOFTWARE.
 */
 
-import { Bluetooth, BluetoothDevice } from "webbluetooth";
-import { BluetoothRemoteGATTCharacteristic } from "webbluetooth";
 import { EventDispatcher } from "./dispatcher";
-
-declare global {
-    interface Navigator {
-        bluetooth: any;
-    }
-}
 
 const CONTROL_UUID = "8ec90001-f315-4f60-9fb8-838830daea50";
 const PACKET_UUID = "8ec90002-f315-4f60-9fb8-838830daea50";
