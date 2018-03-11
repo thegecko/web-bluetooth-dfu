@@ -38,7 +38,7 @@ gulp.task("setWatch", () => {
 
 // Clear built directories
 gulp.task("clean", () => {
-    return del([nodeDir, typesDir, bundleDir]);
+    if (!watching) del([nodeDir, typesDir, bundleDir]);
 });
 
 // Lint the source
