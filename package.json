@@ -49,6 +49,6 @@
     "typescript": "^2.6.2",
     "vinyl-buffer": "^1.0.1",
     "vinyl-source-stream": "^2.0.0",
-    "webbluetooth": "^1.0.2"
+    "webbluetooth": "^1.0.4"
   }
 }
