@@ -148,8 +148,11 @@ export class SecureDfu extends EventDispatcher {
      * Characteristic constructor
      * @param bluetooth A bluetooth instance
      * @param crc32 A CRC32 function
+     * @param delay Milliseconds of delay between packets
      */
-    constructor(private crc32: (data: Array<number> | Uint8Array, seed?: number) => number, private bluetooth?: Bluetooth) {
+    constructor(private crc32: (data: Array<number> | Uint8Array, seed?: number) => number,
+                private bluetooth?: Bluetooth,
+                private delay: number = 0) {
         super();
 
         if (!this.bluetooth && window && window.navigator && window.navigator.bluetooth) {
@@ -361,6 +364,7 @@ export class SecureDfu extends EventDispatcher {
         const packet = data.slice(start, end);
 
         return this.packetChar.writeValue(packet)
+        .then(() => this.delayPromise(this.delay))
         .then(() => {
             this.progress(offset + end);
 
@@ -377,6 +381,12 @@ export class SecureDfu extends EventDispatcher {
         }
 
         return crc === this.crc32(new Uint8Array(buffer));
+    }
+
+    private delayPromise(delay: number) {
+        return new Promise(resolve => {
+            setTimeout(resolve, delay);
+        });
     }
 
     /**
