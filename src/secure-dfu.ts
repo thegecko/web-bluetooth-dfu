@@ -364,7 +364,7 @@ export class SecureDfu extends EventDispatcher {
         const packet = data.slice(start, end);
 
         return this.packetChar.writeValue(packet)
-        .then(this.delayPromise(this.delay))
+        .then(() => this.delayPromise(this.delay))
         .then(() => {
             this.progress(offset + end);
 
@@ -384,13 +384,9 @@ export class SecureDfu extends EventDispatcher {
     }
 
     private delayPromise(delay: number) {
-        return data => {
-            return new Promise((resolve, _) => {
-                setTimeout(() => {
-                    resolve(data);
-                }, delay);
-            });
-        };
+        return new Promise(resolve => {
+            setTimeout(resolve, delay);
+        });
     }
 
     /**
