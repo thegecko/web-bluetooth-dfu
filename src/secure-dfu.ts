@@ -24,6 +24,7 @@
 */
 
 import { EventDispatcher } from "./dispatcher";
+import { UuidOptions } from "./uuid-options";
 
 const CONTROL_UUID = "8ec90001-f315-4f60-9fb8-838830daea50";
 const PACKET_UUID = "8ec90002-f315-4f60-9fb8-838830daea50";
@@ -140,6 +141,13 @@ export class SecureDfu extends EventDispatcher {
      */
     public static EVENT_PROGRESS: string = "progress";
 
+    private DEFAULT_UUIDS: UuidOptions = {
+        service: SecureDfu.SERVICE_UUID,
+        button: BUTTON_UUID,
+        control: CONTROL_UUID,
+        packet: PACKET_UUID
+    };
+
     private notifyFns: {} = {};
     private controlChar: BluetoothRemoteGATTCharacteristic = null;
     private packetChar: BluetoothRemoteGATTCharacteristic = null;
@@ -212,8 +220,7 @@ export class SecureDfu extends EventDispatcher {
         });
     }
 
-    private gattConnect(device: BluetoothDevice, serviceUUID?: number|string): Promise<Array<BluetoothRemoteGATTCharacteristic>> {
-        serviceUUID = serviceUUID || SecureDfu.SERVICE_UUID;
+    private gattConnect(device: BluetoothDevice, serviceUUID: number | string = SecureDfu.SERVICE_UUID): Promise<Array<BluetoothRemoteGATTCharacteristic>> {
         return Promise.resolve()
         .then(() => {
             if (device.gatt.connected) return device.gatt;
@@ -398,23 +405,16 @@ export class SecureDfu extends EventDispatcher {
      * @returns Promise containing the device
      */
     public requestDevice(
-      buttonLess: boolean,
-      filters: Array<BluetoothLEScanFilterInit>,
-      uuids?: {
-          service?: number|string,
-          button?: number|string,
-          control?: number|string,
-          packet?: number|string
-      }
+        buttonLess: boolean,
+        filters: Array<BluetoothLEScanFilterInit>,
+        uuids: UuidOptions = this.DEFAULT_UUIDS
     ): Promise<BluetoothDevice> {
-        uuids = uuids || {};
-        const serviceId = uuids.service || SecureDfu.SERVICE_UUID;
         if (!buttonLess && !filters) {
-            filters = [ { services: [ serviceId ] } ];
+            filters = [ { services: [ uuids.service ] } ];
         }
 
         const options: any = {
-            optionalServices: [ serviceId ]
+            optionalServices: [ uuids.service ]
         };
 
         if (filters) options.filters = filters;
@@ -435,22 +435,17 @@ export class SecureDfu extends EventDispatcher {
      * @param uuids Optional alternative uuids for control, packet or button
      * @returns Promise containing the device if it is still on a valid state
      */
-    public setDfuMode(device: BluetoothDevice, uuids?: { service?: number|string, control?: number|string, packet?: number|string, button?: number|string}): Promise<BluetoothDevice> {
-        uuids = uuids || {};
-        const serviceId = uuids.service || SecureDfu.SERVICE_UUID;
-        const controlId = uuids.control || CONTROL_UUID;
-        const packetId = uuids.packet || PACKET_UUID;
-        const buttonId = uuids.button || BUTTON_UUID;
-        return this.gattConnect(device, serviceId)
+    public setDfuMode(device: BluetoothDevice, uuids: UuidOptions = this.DEFAULT_UUIDS): Promise<BluetoothDevice> {
+        return this.gattConnect(device, uuids.service)
         .then(characteristics => {
             this.log(`found ${characteristics.length} characteristic(s)`);
 
             const controlChar = characteristics.find(characteristic => {
-                return (characteristic.uuid === controlId);
+                return (characteristic.uuid === uuids.control);
             });
 
             const packetChar = characteristics.find(characteristic => {
-                return (characteristic.uuid === packetId);
+                return (characteristic.uuid === uuids.packet);
             });
 
             if (controlChar && packetChar) {
@@ -458,7 +453,7 @@ export class SecureDfu extends EventDispatcher {
             }
 
             const buttonChar = characteristics.find(characteristic => {
-                return (characteristic.uuid === buttonId);
+                return (characteristic.uuid === uuids.button);
             });
 
             if (!buttonChar) {
