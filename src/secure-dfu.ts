@@ -24,7 +24,6 @@
 */
 
 import { EventDispatcher } from "./dispatcher";
-import { UuidOptions } from "./uuid-options";
 
 const CONTROL_UUID = "8ec90001-f315-4f60-9fb8-838830daea50";
 const PACKET_UUID = "8ec90002-f315-4f60-9fb8-838830daea50";
@@ -117,6 +116,13 @@ export interface BluetoothLEScanFilterInit {
      * The device name prefix to filter on
      */
     namePrefix?: string;
+}
+
+export interface UuidOptions {
+    service?: number | string;
+    button?: number | string;
+    control?: number | string;
+    packet?: number | string;
 }
 
 /**
@@ -409,6 +415,10 @@ export class SecureDfu extends EventDispatcher {
         filters: Array<BluetoothLEScanFilterInit>,
         uuids: UuidOptions = this.DEFAULT_UUIDS
     ): Promise<BluetoothDevice> {
+        uuids = {
+            ...this.DEFAULT_UUIDS,
+            ...uuids
+        };
         if (!buttonLess && !filters) {
             filters = [ { services: [ uuids.service ] } ];
         }
@@ -436,6 +446,10 @@ export class SecureDfu extends EventDispatcher {
      * @returns Promise containing the device if it is still on a valid state
      */
     public setDfuMode(device: BluetoothDevice, uuids: UuidOptions = this.DEFAULT_UUIDS): Promise<BluetoothDevice> {
+        uuids = {
+            ...this.DEFAULT_UUIDS,
+            ...uuids
+        };
         return this.gattConnect(device, uuids.service)
         .then(characteristics => {
             this.log(`found ${characteristics.length} characteristic(s)`);
