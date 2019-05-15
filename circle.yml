@@ -3,7 +3,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/node:4.8.0
+      - image: circleci/node:6.15.0
     steps:
       - checkout
       - run: npm install
@@ -15,7 +15,7 @@ jobs:
 
   deploy:
     docker:
-      - image: circleci/node:4.8.0
+      - image: circleci/node:6.15.0
     steps:
       - attach_workspace:
           at: ../

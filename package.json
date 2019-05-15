@@ -28,7 +28,7 @@
     "example": "node examples/node.js"
   },
   "engines": {
-    "node": ">=4.8.0"
+    "node": ">=6.15.0"
   },
   "dependencies": {
     "@types/node": "^8.0.54",
