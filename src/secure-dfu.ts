@@ -283,6 +283,7 @@ export class SecureDfu extends EventDispatcher {
 
             const value = new Uint8Array(size);
             value.set(operation);
+
             if (buffer) {
                 const data = new Uint8Array(buffer);
                 value.set(data, operation.length);
@@ -410,15 +411,12 @@ export class SecureDfu extends EventDispatcher {
      * @param uuids Optional alternative uuids for service, control, packet or button
      * @returns Promise containing the device
      */
-    public requestDevice(
-        buttonLess: boolean,
-        filters: Array<BluetoothLEScanFilterInit>,
-        uuids: UuidOptions = this.DEFAULT_UUIDS
-    ): Promise<BluetoothDevice> {
+    public requestDevice(buttonLess: boolean, filters: Array<BluetoothLEScanFilterInit>, uuids: UuidOptions = this.DEFAULT_UUIDS): Promise<BluetoothDevice> {
         uuids = {
             ...this.DEFAULT_UUIDS,
             ...uuids
         };
+
         if (!buttonLess && !filters) {
             filters = [ { services: [ uuids.service ] } ];
         }
@@ -450,6 +448,7 @@ export class SecureDfu extends EventDispatcher {
             ...this.DEFAULT_UUIDS,
             ...uuids
         };
+
         return this.gattConnect(device, uuids.service)
         .then(characteristics => {
             this.log(`found ${characteristics.length} characteristic(s)`);
