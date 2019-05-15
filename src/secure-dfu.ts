@@ -118,6 +118,13 @@ export interface BluetoothLEScanFilterInit {
     namePrefix?: string;
 }
 
+export interface UuidOptions {
+    service?: number | string;
+    button?: number | string;
+    control?: number | string;
+    packet?: number | string;
+}
+
 /**
  * Secure Device Firmware Update class
  */
@@ -139,6 +146,13 @@ export class SecureDfu extends EventDispatcher {
      * @event
      */
     public static EVENT_PROGRESS: string = "progress";
+
+    private DEFAULT_UUIDS: UuidOptions = {
+        service: SecureDfu.SERVICE_UUID,
+        button: BUTTON_UUID,
+        control: CONTROL_UUID,
+        packet: PACKET_UUID
+    };
 
     private notifyFns: {} = {};
     private controlChar: BluetoothRemoteGATTCharacteristic = null;
@@ -212,7 +226,7 @@ export class SecureDfu extends EventDispatcher {
         });
     }
 
-    private gattConnect(device: BluetoothDevice): Promise<Array<BluetoothRemoteGATTCharacteristic>> {
+    private gattConnect(device: BluetoothDevice, serviceUUID: number | string = SecureDfu.SERVICE_UUID): Promise<Array<BluetoothRemoteGATTCharacteristic>> {
         return Promise.resolve()
         .then(() => {
             if (device.gatt.connected) return device.gatt;
@@ -220,7 +234,7 @@ export class SecureDfu extends EventDispatcher {
         })
         .then(server => {
             this.log("connected to gatt server");
-            return server.getPrimaryService(SecureDfu.SERVICE_UUID)
+            return server.getPrimaryService(serviceUUID)
             .catch(() => {
                 throw new Error("Unable to find DFU service");
             });
@@ -393,15 +407,24 @@ export class SecureDfu extends EventDispatcher {
      * Scans for a device to update
      * @param buttonLess Scans for all devices and will automatically call `setDfuMode`
      * @param filters Alternative filters to use when scanning
+     * @param uuids Optional alternative uuids for service, control, packet or button
      * @returns Promise containing the device
      */
-    public requestDevice(buttonLess: boolean, filters: Array<BluetoothLEScanFilterInit>): Promise<BluetoothDevice> {
+    public requestDevice(
+        buttonLess: boolean,
+        filters: Array<BluetoothLEScanFilterInit>,
+        uuids: UuidOptions = this.DEFAULT_UUIDS
+    ): Promise<BluetoothDevice> {
+        uuids = {
+            ...this.DEFAULT_UUIDS,
+            ...uuids
+        };
         if (!buttonLess && !filters) {
-            filters = [ { services: [ SecureDfu.SERVICE_UUID ] } ];
+            filters = [ { services: [ uuids.service ] } ];
         }
 
         const options: any = {
-            optionalServices: [ SecureDfu.SERVICE_UUID ]
+            optionalServices: [ uuids.service ]
         };
 
         if (filters) options.filters = filters;
@@ -410,7 +433,7 @@ export class SecureDfu extends EventDispatcher {
         return this.bluetooth.requestDevice(options)
         .then(device => {
             if (buttonLess) {
-                return this.setDfuMode(device);
+                return this.setDfuMode(device, uuids);
             }
             return device;
         });
@@ -419,19 +442,24 @@ export class SecureDfu extends EventDispatcher {
     /**
      * Sets the DFU mode of a device, preparing it for update
      * @param device The device to switch mode
+     * @param uuids Optional alternative uuids for control, packet or button
      * @returns Promise containing the device if it is still on a valid state
      */
-    public setDfuMode(device: BluetoothDevice): Promise<BluetoothDevice> {
-        return this.gattConnect(device)
+    public setDfuMode(device: BluetoothDevice, uuids: UuidOptions = this.DEFAULT_UUIDS): Promise<BluetoothDevice> {
+        uuids = {
+            ...this.DEFAULT_UUIDS,
+            ...uuids
+        };
+        return this.gattConnect(device, uuids.service)
         .then(characteristics => {
             this.log(`found ${characteristics.length} characteristic(s)`);
 
             const controlChar = characteristics.find(characteristic => {
-                return (characteristic.uuid === CONTROL_UUID);
+                return (characteristic.uuid === uuids.control);
             });
 
             const packetChar = characteristics.find(characteristic => {
-                return (characteristic.uuid === PACKET_UUID);
+                return (characteristic.uuid === uuids.packet);
             });
 
             if (controlChar && packetChar) {
@@ -439,7 +467,7 @@ export class SecureDfu extends EventDispatcher {
             }
 
             const buttonChar = characteristics.find(characteristic => {
-                return (characteristic.uuid === BUTTON_UUID);
+                return (characteristic.uuid === uuids.button);
             });
 
             if (!buttonChar) {
