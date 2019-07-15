@@ -11,14 +11,14 @@ Update device firmware via Nordic's DFU protocols using [Web Bluetooth](https://
 
 Since version 12 of Nordic's SDK, the device firmware update protocol has changed to be made secure. The protocol can be seen here:
 
-http://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v12.0.0/lib_dfu_transport_ble.html
+https://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v12.0.0/lib_dfu_transport_ble.html
 
 Earlier protocols were insecure, so it is recommended to use the secure protocol version in this package.
 
 ## Features
 
  - Supports continuation of failed transfers and skipping of any init packet if already valid
- - Supports [Buttonless DFU](http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v13.0.0%2Fble_sdk_app_buttonless_dfu.html) activation
+ - Supports [Buttonless DFU](https://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v13.0.0/ble_sdk_app_buttonless_dfu.html) activation
  - Uses ES6 syntax assuming that all JS engines supporting Web Bluetooth are also ES6 compatible
  - Written with [TypeScript](https://www.typescriptlang.org/) to promote type safety
 
@@ -44,7 +44,7 @@ The package is distributed using npm. To install the package in your project:
 
 ## Device Configuration
 
-You will need a [Nordic](http://www.nordicsemi.com/) [nRF51822](http://www.nordicsemi.com/eng/Products/nRF51-DK), [nRF52832](http://www.nordicsemi.com/eng/Products/Bluetooth-low-energy/nRF52-DK) or [nRF52840](http://www.nordicsemi.com/eng/Products/nRF52840-Preview-DK) development kit running the latest softdevice. Secure DFU supports softdevices from S130.
+You will need a [Nordic](https://www.nordicsemi.com/) [nRF51822](https://www.nordicsemi.com/eng/Products/nRF51-DK), [nRF52832](http://www.nordicsemi.com/eng/Products/Bluetooth-low-energy/nRF52-DK) or [nRF52840](http://www.nordicsemi.com/eng/Products/nRF52840-Preview-DK) development kit running the latest softdevice. Secure DFU supports softdevices from S130.
 
 Softdevices can be found on Nordic's site:
 
@@ -80,7 +80,7 @@ __Using Test DFU Bootloader__
  - Flash the bootloader: `$ nrfjprog --family NRF52 --program <bootloader.hex> --sectoranduicrerase --reset`
 
 __Signing Keys__
- - Create a [signing key](http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v13.0.0%2Fble_sdk_app_buttonless_dfu.html): `$ nrfutil keys generate private.key`
+ - Create a [signing key](https://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v13.0.0/ble_sdk_app_buttonless_dfu.html): `$ nrfutil keys generate private.key`
  - Generate the __.c__ file for the key: `$ nrfutil keys display --key pk --format code private.key --out_file dfu_public_key.c`
 
 __Developing an Application__
@@ -93,7 +93,7 @@ __Building DFU Package__
 
 Refer to this document:
 
-http://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.sdk5.v13.0.0%2Fble_sdk_app_dfu_bootloader.html
+https://infocenter.nordicsemi.com/topic/com.nordic.infocenter.sdk5.v13.0.0/ble_sdk_app_dfu_bootloader.html
 
 e.g.:
 
