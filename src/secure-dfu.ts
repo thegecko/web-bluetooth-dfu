@@ -299,7 +299,12 @@ export class SecureDfu extends EventDispatcher {
     }
 
     private sendControl(operation: Array<number>, buffer?: ArrayBuffer): Promise<DataView> {
-        return this.sendOperation(this.controlChar, operation, buffer);
+        return new Promise(resolve => {
+            this.sendOperation(this.controlChar, operation, buffer)
+            .then(resp => {
+                setTimeout(() => resolve(resp), this.delay);
+            });
+        });
     }
 
     private transferInit(buffer: ArrayBuffer): Promise<DataView> {
