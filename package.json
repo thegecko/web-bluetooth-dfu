@@ -38,7 +38,7 @@
     "browserify": "^15.0.0",
     "crc-32": "^1.0.2",
     "del": "^3.0.0",
-    "gulp": "^3.9.1",
+    "gulp": "^4.0.2",
     "gulp-sourcemaps": "^2.6.1",
     "gulp-tslint": "^8.1.2",
     "gulp-typescript": "^3.2.3",
