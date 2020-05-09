@@ -1,48 +1,50 @@
-var path        = require("path");
-var browserify  = require("browserify");
-var del         = require("del");
-var merge       = require("merge2");
-var buffer      = require("vinyl-buffer");
-var source      = require("vinyl-source-stream");
-var gulp        = require("gulp");
-var sourcemaps  = require("gulp-sourcemaps");
-var typescript  = require("gulp-typescript");
-var tslint      = require("gulp-tslint");
-var uglify      = require("gulp-uglify");
+const path        = require("path");
+const browserify  = require("browserify");
+const del         = require("del");
+const merge       = require("merge2");
+const buffer      = require("vinyl-buffer");
+const source      = require("vinyl-source-stream");
+const gulp        = require("gulp");
+const sourcemaps  = require("gulp-sourcemaps");
+const typescript  = require("gulp-typescript");
+const tslint      = require("gulp-tslint");
+const uglify      = require("gulp-uglify");
 
 // Source
-var srcDir = "src";
-var srcFiles = srcDir + "/**/*.ts";
+const srcDir = "src";
+const srcFiles = srcDir + "/**/*.ts";
 
 // Node
-var nodeDir = "lib";
-var typesDir = "types";
+const nodeDir = "lib";
+const typesDir = "types";
 
 // Browser bundles
-var bundleDir = "dist";
-var bundleGlobal = "SecureDfu";
+const bundleDir = "dist";
+const bundleGlobal = "SecureDfu";
 
-var watching = false;
+let watching = false;
 
 // Error handler suppresses exists during watch
-function handleError(error) {
+const handleError = error => {
     console.log(error.message);
     if (watching) this.emit("end");
     else process.exit(1);
 }
 
 // Set watching
-gulp.task("setWatch", () => {
+const taskSetWatchFlag = (done) => {
     watching = true;
-});
+    done();
+};
 
 // Clear built directories
-gulp.task("clean", () => {
+const taskClean = (done) => {
     if (!watching) del([nodeDir, typesDir, bundleDir]);
-});
+    done();
+};
 
 // Lint the source
-gulp.task("lint", () => {
+const taskLint = () => {
     return gulp.src(srcFiles)
     .pipe(tslint({
         formatter: "stylish"
@@ -50,10 +52,10 @@ gulp.task("lint", () => {
     .pipe(tslint.report({
         emitError: !watching
     }))
-});
+};
 
 // Build TypeScript source into CommonJS Node modules
-gulp.task("compile", ["clean"], () => {
+const taskCompile = () => {
     var tsResult = gulp.src(srcFiles)
     .pipe(sourcemaps.init())
     .pipe(typescript.createProject("tsconfig.json")())
@@ -65,10 +67,10 @@ gulp.task("compile", ["clean"], () => {
         })).pipe(gulp.dest(nodeDir)),
         tsResult.dts.pipe(gulp.dest(typesDir))
     ]);
-});
+};
 
 // Build CommonJS modules into browser bundles
-gulp.task("bundle", ["compile"], () => {
+const taskBundle = () => {
     var fileName = bundleGlobal.replace(/([A-Z]+)/g, (match, submatch, offset) => {
         return `${offset > 0 ? "-" : ""}${match.toLowerCase()}`;
     });
@@ -87,11 +89,15 @@ gulp.task("bundle", ["compile"], () => {
     .pipe(sourcemaps.write(".", {
         sourceRoot: path.relative(bundleDir, nodeDir)
     }))
-    .pipe(gulp.dest(bundleDir));
-});
+    .pipe(gulp.dest(bundleDir))
+};
 
-gulp.task("watch", ["setWatch", "default"], () => {
-    gulp.watch(srcFiles, ["default"]);
-});
+exports.bundle = gulp.series(taskClean, taskCompile, taskBundle);
+exports.default = gulp.series(taskLint, exports.bundle);
 
-gulp.task("default", ["lint", "bundle"]);
+const taskSetWatch = (done) => {
+  gulp.watch(srcFiles, exports.default);
+  done();
+};
+
+exports.watch = gulp.series(taskSetWatchFlag, exports.default, taskSetWatch);

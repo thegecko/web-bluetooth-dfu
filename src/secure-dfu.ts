@@ -294,7 +294,13 @@ export class SecureDfu extends EventDispatcher {
                 reject: reject
             };
 
-            characteristic.writeValue(value);
+            characteristic.writeValue(value)
+            .catch(e => {
+                this.log(e);
+                return Promise.resolve()
+                    .then(() => this.delayPromise(500))
+                    .then(() => characteristic.writeValue(value));
+            });
         });
     }
 
