@@ -89,7 +89,7 @@ const taskBundle = () => {
     .pipe(sourcemaps.write(".", {
         sourceRoot: path.relative(bundleDir, nodeDir)
     }))
-    .pipe(gulp.dest(bundleDir))
+    .pipe(gulp.dest(bundleDir));
 };
 
 exports.bundle = gulp.series(taskClean, taskCompile, taskBundle);
