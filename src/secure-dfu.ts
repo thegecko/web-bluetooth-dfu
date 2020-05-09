@@ -299,6 +299,7 @@ export class SecureDfu extends EventDispatcher {
                 this.log(e);
                 return Promise.resolve()
                     .then(() => this.delayPromise(500))
+                    // Retry once
                     .then(() => characteristic.writeValue(value));
             });
         });
