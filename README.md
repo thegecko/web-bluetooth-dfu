@@ -64,6 +64,9 @@ https://devzone.nordicsemi.com/blogs/1085/getting-started-with-nordics-secure-df
 
 tl;dr
 
+__J-LINK Interface Firmware__
+ - Ensure device is running the J-LINK interface firmware available from [Nordic](https://www.nordicsemi.com/Software-and-tools/Development-Kits/nRF52-DK)
+
 __Download / Install__
  - Download [Nordic SDK](https://developer.nordicsemi.com/nRF5_SDK/)
  - Install [J-Link Software Package](https://www.segger.com/downloads/jlink)

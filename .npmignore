@@ -1,4 +1,5 @@
 _flash
+_if
 firmware
 .gitignore
 circle.yml
