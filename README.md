@@ -34,7 +34,7 @@ https://thegecko.github.io/web-bluetooth-dfu/
 
 ## Prerequisites
 
-[Node.js > v6.15.0](https://nodejs.org), which includes `npm`.
+[Node.js > v8.14.0](https://nodejs.org), which includes `npm`.
 
 ## Installation
 
@@ -63,6 +63,9 @@ An excellent article exists with a walkthrough of using the device firmware upda
 https://devzone.nordicsemi.com/blogs/1085/getting-started-with-nordics-secure-dfu-bootloader/
 
 tl;dr
+
+__J-LINK Interface Firmware__
+ - Ensure device is running the J-LINK interface firmware available from [Nordic](https://www.nordicsemi.com/Software-and-tools/Development-Kits/nRF52-DK)
 
 __Download / Install__
  - Download [Nordic SDK](https://developer.nordicsemi.com/nRF5_SDK/)
