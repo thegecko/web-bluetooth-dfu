@@ -2,18 +2,6 @@
   "name": "web-bluetooth-dfu",
   "version": "1.2.0",
   "description": "Device firmware update with Web Bluetooth",
-  "homepage": "https://thegecko.github.io/web-bluetooth-dfu/",
-  "author": "Rob Moran <github@thegecko.org>",
-  "license": "MIT",
-  "types": "./types/index.d.ts",
-  "main": "./index.js",
-  "browser": {
-    "./index.js": "./dist/secure-dfu.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/thegecko/web-bluetooth-dfu.git"
-  },
   "keywords": [
     "ble",
     "bluetooth",
@@ -23,12 +11,15 @@
     "nordic",
     "web-bluetooth"
   ],
+  "repository": "https://thegecko.github.io/web-bluetooth-dfu/",
+  "license": "MIT",
+  "author": "Rob Moran <github@thegecko.org>",
+  "main": "./index.js",
+  "browser": "./dist/secure-dfu.js",
+  "types": "./types/index.d.ts",
   "scripts": {
     "build": "gulp",
     "example": "node examples/node.js"
-  },
-  "engines": {
-    "node": ">=8.14.0"
   },
   "dependencies": {
     "@types/node": "^14.6.4",
@@ -52,5 +43,8 @@
     "vinyl-buffer": "^1.0.1",
     "vinyl-source-stream": "^2.0.0",
     "webbluetooth": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=8.14.0"
   }
 }
