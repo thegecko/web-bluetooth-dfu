@@ -510,7 +510,7 @@ export class SecureDfu extends EventDispatcher {
                 })
                 .then(() => {
                     this.log("sent DFU mode");
-                    complete();
+                    complete.call(this);
                 });
             });
         });
