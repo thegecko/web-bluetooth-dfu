@@ -306,10 +306,12 @@ export class SecureDfu extends EventDispatcher {
     }
 
     private sendControl(operation: Array<number>, buffer?: ArrayBuffer): Promise<DataView> {
-        return new Promise(resolve => {
+        return new Promise((resolve, reject) => {
             this.sendOperation(this.controlChar, operation, buffer)
             .then(resp => {
                 setTimeout(() => resolve(resp), this.delay);
+            }).catch(err => {
+                reject(err);
             });
         });
     }
