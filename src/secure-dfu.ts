@@ -548,7 +548,14 @@ export class SecureDfu extends EventDispatcher {
                     resolve(device);
                 });
             })
-            .catch(error => reject(error));
+            .catch(error => {
+                if (this.delay === 0) {
+                    this.log("DFU update failed, but delay=0. Trying again with delay=10...");
+                    this.delay = 10;
+                    return this.update(device, init, firmware);
+                }
+                reject(error);
+            });
         });
     }
 }
